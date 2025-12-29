@@ -1,0 +1,5 @@
+2025-12-26T18:47:58.949Z [ERROR] Bot error | {"userId":8586387042,"error":"400: Bad Request: can't parse entities: Character '!' is reserved and must be escaped with the preceding '\\'","code":400}
+2025-12-26T18:48:15.836Z [ERROR] Bot error | {"userId":8586387042,"error":"400: Bad Request: can't parse entities: Character '!' is reserved and must be escaped with the preceding '\\'","code":400}
+2025-12-26T18:48:42.597Z [ERROR] Bot error | {"userId":8586387042,"error":"400: Bad Request: can't parse entities: Character '!' is reserved and must be escaped with the preceding '\\'","code":400}
+2025-12-26T19:01:51.495Z [ERROR] Bot error | {"userId":8586387042,"error":"400: Bad Request: can't parse entities: Can't find end of the entity starting at byte offset 249","code":400}
+2025-12-26T19:14:42.205Z [ERROR] Bot error | {"userId":8586387042,"error":"400: Bad Request: can't parse entities: Can't find end of the entity starting at byte offset 247","code":400}

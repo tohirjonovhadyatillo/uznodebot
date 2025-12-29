@@ -1,0 +1,43 @@
+{
+  "name": "senator-telegram-bot",
+  "version": "1.0.0",
+  "description": "Professional Telegram contest bot for iPhone and Redmi giveaways",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "nodemon bot.js",
+    "test": "node test.js",
+    "lint": "eslint .",
+    "backup": "node scripts/backup.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "contest",
+    "giveaway",
+    "iphone",
+    "redmi"
+  ],
+  "author": "Senator Team",
+  "license": "MIT",
+  "dependencies": {
+    "telegraf": "^4.15.3",
+    "mongoose": "^7.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "eslint": "^8.53.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/senator-team/telegram-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/senator-team/telegram-bot/issues"
+  },
+  "homepage": "https://github.com/senator-team/telegram-bot#readme"
+}
