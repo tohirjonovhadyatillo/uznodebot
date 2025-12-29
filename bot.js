@@ -814,7 +814,7 @@ class BotScenes {
                 await ctx.editMessageText(
                     Utils.escapeMarkdown(
                         '📝 *ID raqamingizni yuboring:*\n\n' +
-                        'Iltimos, saytdan olingan ID raqamingizni yuboring.\n' +
+                        'Iltimos, saytdan olingan ID raqamingizni yuboring.\n'
                     ),
                     { 
                         parse_mode: 'MarkdownV2'
