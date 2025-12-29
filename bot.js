@@ -311,12 +311,12 @@ class Utils {
         
         // 150 bilan boshlanishini tekshirish
         if (!id.startsWith('150')) {
-            throw new Error('❌ ID raqam 150 bilan boshlanishi kerak!\n📌 Misol: 150123456');
+            throw new Error('❌ ID raqam noto\'ri yoki eskirgan!');
         }
         
         // Pattern tekshirish
         if (!contest.id_pattern.test(id)) {
-            throw new Error('❌ ID noto\'g\'ri formatda!\n📌 Misol: 150123456');
+            throw new Error('❌ ID noto\'g\'ri formatda!\n📌');
         }
         
         return id;
@@ -815,9 +815,6 @@ class BotScenes {
                     Utils.escapeMarkdown(
                         '📝 *ID raqamingizni yuboring:*\n\n' +
                         'Iltimos, saytdan olingan ID raqamingizni yuboring.\n' +
-                        'ID 150 bilan boshlanishi va faqat raqamlardan iborat bo\'lish kerak.\n\n' +
-                        '📌 *Misol:* 150123456\n' +
-                        '⚠️ *Eslatma:* Agar ID 150 dan boshlanmasa yoki noto\'g\'ri bo\'lsa, "Bu ID eskirgan yoki noto\'g\'ri" xabarini ko\'rasiz!'
                     ),
                     { 
                         parse_mode: 'MarkdownV2'
@@ -845,9 +842,7 @@ class BotScenes {
                                 await ctx.reply(
                                     Utils.escapeMarkdown(
                                         '❌ *BU ID ESKIRGAN YOKI NOTO\'G\'RI!*\n\n' +
-                                        'Iltimos, saytga qaytib ro\'yxatdan o\'ting va yangi ID oling!\n' +
-                                        'Yangi ID 150 bilan boshlanishi kerak.\n' +
-                                        '📌 *Misol:* 150123456'
+                                        'Iltimos, saytga qaytib ro\'yxatdan o\'ting va yangi ID oling!\n'
                                     ),
                                     { parse_mode: 'MarkdownV2' }
                                 );
