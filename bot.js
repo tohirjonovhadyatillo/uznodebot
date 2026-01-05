@@ -76,7 +76,7 @@ const CONFIG = {
         IPHONE: {
             name: 'iPhone 17 Pro Max',
             prize_count: 5,
-            site_url: 'https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration',
+            site_url: 'https://xparisport.com/?promocode=senator',
             promo_code: 'SENATOR',
             id_pattern: /^150\d{3,12}$/,
             id_min_length: 6,
