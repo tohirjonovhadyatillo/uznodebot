@@ -492,7 +492,7 @@ class Utils {
     }
 
     // 150 bilan boshlanishini tekshirish
-    if (!id.startsWith("153")) {
+    if (!/^\d+$/.test(id) || Number(id) < 150) {
       throw new Error("❌ ID raqam noto'ri yoki eskirgan! ID 150 bilan boshlanishi kerak.");
     }
 
@@ -1416,7 +1416,6 @@ class BotScenes {
         ctx.scene.leave();
       }
     });
-
     // Qatnashish action - YANGILANGAN (safeEditMessageText ishlatiladi)
     scene.action(`participate_${contestType.toLowerCase()}`, async (ctx) => {
       try {
