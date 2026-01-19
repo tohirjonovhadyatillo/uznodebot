@@ -112,8 +112,8 @@ const CONFIG = {
         GENTRA: {
             name: 'Chevrolet Gentra',
             prize_count: 1,
-            site_url: 'https://senator-promo.uz/gentra',
-            promo_code: 'SENATOR2024',
+            site_url: 'https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration',
+            promo_code: 'SENATOR',
             id_pattern: /^GENTRA\d{5,10}$/,
             id_min_length: 6,
             id_max_length: 15,
@@ -1501,7 +1501,7 @@ class SenatorBot {
                 '4. ID ni yuborish\n\n' +
                 '🚗 *Gentra yutish uchun:*\n' +
                 '1. Saytga kirish\n' +
-                '2. Promokod: SENATOR2024\n' +
+                '2. Promokod: SENATOR\n' +
                 '3. Ariza to\'ldirish\n' +
                 '4. ID ni yuborish\n\n' +
                 '⚠️ *DIQQAT!*\n' +
@@ -1599,7 +1599,7 @@ class SenatorBot {
                 '4. ID ni yuborish\n\n' +
                 '🚗 *Gentra yutish uchun:*\n' +
                 '1. Saytga kirish\n' +
-                '2. Promokod: SENATOR2024\n' +
+                '2. Promokod: SENATOR\n' +
                 '3. Ariza to\'ldirish\n' +
                 '4. ID ni yuborish\n\n' +
                 '⚠️ *DIQQAT!*\n' +
