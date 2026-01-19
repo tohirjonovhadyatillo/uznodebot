@@ -47,27 +47,11 @@ const CONFIG = {
       username: "@SENATOR_PUBGM",
     },
     {
-      id: "-1002226075129",
-      name: "На Чиле +18",
-      url: "https://t.me/+4byxN4zF6vJhNDZi",
-      type: "private",
-      invite_link: "https://t.me/+4byxN4zF6vJhNDZi",
-      requires_admin: true,
-    },
-    {
       id: "@senatorazart",
       name: "SENATOR 19+",
       url: "https://t.me/senatorazart",
       type: "public",
       username: "@senatorazart",
-    },
-    {
-      id: "-1002027973620",
-      name: "Senator 18+",
-      url: "https://t.me/+0IhgHgHljec1M2Zi",
-      type: "private",
-      invite_link: "https://t.me/+0IhgHgHljec1M2Zi",
-      requires_admin: true,
     },
     {
       id: "@SENATORKUPON",
