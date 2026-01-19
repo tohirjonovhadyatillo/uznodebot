@@ -46,7 +46,8 @@ const CONFIG = {
             name: 'Senator 18+',
             url: 'https://t.me/+4byxN4zF6vJhNDZi',
             type: 'private',
-            invite_link: 'https://t.me/+4byxN4zF6vJhNDZi'
+            invite_link: 'https://t.me/+4byxN4zF6vJhNDZi',
+            requires_admin: true // Bu kanalga admin bo'lish kerak
         },
         {
             id: '@senatorazart',
@@ -60,7 +61,8 @@ const CONFIG = {
             name: 'Senator 19+',
             url: 'https://t.me/+0IhgHgHljec1M2Zi',
             type: 'private',
-            invite_link: 'https://t.me/+0IhgHgHljec1M2Zi'
+            invite_link: 'https://t.me/+0IhgHgHljec1M2Zi',
+            requires_admin: true // Bu kanalga admin bo'lish kerak
         },
         {
             id: '@SENATORKUPON',
@@ -76,7 +78,7 @@ const CONFIG = {
         IPHONE: {
             name: 'iPhone 17 Pro Max',
             prize_count: 5,
-            site_url: 'https://xparisport.com/?promocode=senator',
+            site_url: 'https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration',
             promo_code: 'SENATOR',
             id_pattern: /^150\d{3,12}$/,
             id_min_length: 6,
@@ -86,28 +88,50 @@ const CONFIG = {
                 'Saytga ro\'yxatdan o\'ting',
                 'Promokod: SENATOR',
                 'ID raqamingizni oling'
-            ]
+            ],
+            button_text: '📱 iPhone 17 Pro Max',
+            emoji: '📱'
         },
         REDMI: {
             name: 'Redmi Smartphone',
             prize_count: 10,
             site_url: 'https://xparisport.com/?promocode=senator',
             promo_code: 'SENATOR',
-            id_pattern: /^150\d{3,12}$/, // iPhone bilan bir xil pattern
-            id_min_length: 6, // iPhone bilan bir xil
-            id_max_length: 15, // iPhone bilan bir xil
+            id_pattern: /^150\d{3,12}$/,
+            id_min_length: 6,
+            id_max_length: 15,
             description: '10 ta Redmi telefon sovg\'a qilinadi!',
             rules: [
                 'Saytga ro\'yxatdan o\'ting',
                 'Promokod: SENATOR',
                 'ID raqamingizni oling'
-            ]
+            ],
+            button_text: '📱 Redmi',
+            emoji: '📱'
+        },
+        GENTRA: {
+            name: 'Chevrolet Gentra',
+            prize_count: 1,
+            site_url: 'https://senator-promo.uz/gentra',
+            promo_code: 'SENATOR2024',
+            id_pattern: /^GENTRA\d{5,10}$/,
+            id_min_length: 6,
+            id_max_length: 15,
+            description: '1 ta Chevrolet Gentra avtomobil sovg\'a qilinadi!',
+            rules: [
+                'Saytga ro\'yxatdan o\'ting',
+                'Promokod: SENATOR2024',
+                'Avtomobil uchun ariza to\'ldiring',
+                'ID raqamingizni oling'
+            ],
+            button_text: '🚗 Chevrolet Gentra',
+            emoji: '🚗'
         }
     },
     
     // Bot Behavior Configuration
     SETTINGS: {
-        subscription_check_interval: 3600000, // 1 hour in milliseconds
+        subscription_check_interval: 300000, // 5 daqiqa
         max_retries: 3,
         request_timeout: 10000,
         cache_duration: 300000, // 5 minutes
@@ -139,7 +163,8 @@ const userSchema = new mongoose.Schema({
     subscribedChannels: [{
         channelId: String,
         channelName: String,
-        subscribedAt: Date
+        subscribedAt: Date,
+        isAdmin: { type: Boolean, default: false }
     }],
     isSubscribed: { type: Boolean, default: false, index: true },
     subscriptionCheckedAt: Date,
@@ -158,6 +183,13 @@ const userSchema = new mongoose.Schema({
             participationDate: Date,
             verified: { type: Boolean, default: false },
             verificationDate: Date
+        },
+        gentra: {
+            participated: { type: Boolean, default: false },
+            participantId: { type: String, sparse: true },
+            participationDate: Date,
+            verified: { type: Boolean, default: false },
+            verificationDate: Date
         }
     },
     
@@ -168,6 +200,7 @@ const userSchema = new mongoose.Schema({
     userAgent: String,
     isBlocked: { type: Boolean, default: false },
     blockReason: String,
+    isActive: { type: Boolean, default: true, index: true },
     
     createdAt: { type: Date, default: Date.now, index: true },
     updatedAt: { type: Date, default: Date.now }
@@ -189,10 +222,14 @@ userSchema.virtual('hasParticipatedRedmi').get(function() {
     return this.contests?.redmi?.participated || false;
 });
 
+userSchema.virtual('hasParticipatedGentra').get(function() {
+    return this.contests?.gentra?.participated || false;
+});
+
 const User = mongoose.model('User', userSchema);
 
 const winnerSchema = new mongoose.Schema({
-    contestType: { type: String, enum: ['iphone', 'redmi'], required: true, index: true },
+    contestType: { type: String, enum: ['iphone', 'redmi', 'gentra'], required: true, index: true },
     userId: { type: Number, required: true, index: true },
     userInfo: {
         telegramId: Number,
@@ -251,6 +288,36 @@ const logSchema = new mongoose.Schema({
 
 const Log = mongoose.model('Log', logSchema);
 
+const notificationSchema = new mongoose.Schema({
+    adminId: { type: Number, required: true },
+    adminUsername: String,
+    
+    message: { type: String, required: true },
+    totalSent: { type: Number, default: 0 },
+    successful: { type: Number, default: 0 },
+    failed: { type: Number, default: 0 },
+    
+    filters: {
+        subscribed: Boolean,
+        participatedIn: String,
+        minParticipationCount: Number
+    },
+    
+    scheduledAt: Date,
+    sentAt: Date,
+    completedAt: Date,
+    
+    status: { 
+        type: String, 
+        enum: ['pending', 'sending', 'completed', 'failed'], 
+        default: 'pending' 
+    },
+    
+    createdAt: { type: Date, default: Date.now, index: true }
+});
+
+const Notification = mongoose.model('Notification', notificationSchema);
+
 // ============================
 // 3. UTILITY FUNCTIONS
 // ============================
@@ -292,13 +359,35 @@ class Utils {
         }
         
         // ID ni tozalash
-        id = id.toString().trim();
+        id = id.toString().trim().toUpperCase();
         
         // Bo'sh yoki undefined tekshirish
         if (!id || id === '') {
             throw new Error('❌ ID raqam kiritilmadi!');
         }
         
+        // Gentra uchun maxsus validatsiya
+        if (contestType.toUpperCase() === 'GENTRA') {
+            // GENTRA bilan boshlanishini tekshirish
+            if (!id.startsWith('GENTRA')) {
+                throw new Error('❌ ID "GENTRA" bilan boshlanishi kerak!\nMasalan: GENTRA12345');
+            }
+            
+            // Faqat GENTRA dan keyingi qism raqam bo'lishi kerak
+            const numberPart = id.substring(6);
+            if (!/^\d+$/.test(numberPart)) {
+                throw new Error('❌ ID raqam qismi faqat raqamlardan iborat bo\'lishi kerak!');
+            }
+            
+            // Uzunlik tekshirish
+            if (id.length < contest.id_min_length || id.length > contest.id_max_length) {
+                throw new Error(`❌ ID ${contest.id_min_length} dan ${contest.id_max_length} gacha belgidan iborat bo'lishi kerak!`);
+            }
+            
+            return id;
+        }
+        
+        // iPhone va Redmi uchun validatsiya
         // Faqat raqamlardan iboratligini tekshirish
         if (!/^\d+$/.test(id)) {
             throw new Error('❌ ID faqat raqamlardan iborat bo\'lishi kerak!');
@@ -355,6 +444,20 @@ class Utils {
             text = text.replace(new RegExp(`\\${char}`, 'g'), `\\${char}`);
         }
         return text;
+    }
+    
+    static async sendMessageWithRetry(bot, chatId, text, options = {}) {
+        try {
+            return await bot.telegram.sendMessage(chatId, text, options);
+        } catch (error) {
+            if (error.response && error.response.error_code === 429) {
+                // Too many requests - wait and retry
+                const retryAfter = error.response.parameters?.retry_after || 1;
+                await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+                return await bot.telegram.sendMessage(chatId, text, options);
+            }
+            throw error;
+        }
     }
 }
 
@@ -418,7 +521,8 @@ class DatabaseService {
                         isSubscribed: false,
                         contests: {
                             iphone: { participated: false },
-                            redmi: { participated: false }
+                            redmi: { participated: false },
+                            gentra: { participated: false }
                         },
                         lastActivity: new Date()
                     });
@@ -472,17 +576,34 @@ class DatabaseService {
                 
                 for (const channel of CONFIG.REQUIRED_CHANNELS) {
                     try {
-                        const member = await bot.getChatMember(channel.id, userId);
-                        const isMember = !(member.status === 'left' || member.status === 'kicked');
+                        let isMember = false;
+                        let isAdmin = false;
+                        
+                        try {
+                            const member = await bot.getChatMember(channel.id, userId);
+                            isMember = !(member.status === 'left' || member.status === 'kicked');
+                            
+                            // Admin tekshirish
+                            if (channel.requires_admin) {
+                                isAdmin = member.status === 'administrator' || member.status === 'creator';
+                                isMember = isAdmin; // Admin bo'lsagina a'zo hisoblanadi
+                            }
+                        } catch (error) {
+                            console.log(`Kanalni tekshirishda xatolik (${channel.name}):`, error.message);
+                        }
                         
                         if (isMember) {
                             subscribedChannels.push({
                                 channelId: channel.id,
                                 channelName: channel.name,
-                                subscribedAt: new Date()
+                                subscribedAt: new Date(),
+                                isAdmin: isAdmin
                             });
                         } else {
-                            notSubscribed.push(channel);
+                            notSubscribed.push({
+                                ...channel,
+                                requiresAdmin: channel.requires_admin
+                            });
                         }
                     } catch (error) {
                         console.error(`Kanalni tekshirishda xatolik (${channel.name}):`, error.message);
@@ -588,6 +709,52 @@ class DatabaseService {
         });
     }
     
+    static async handleUserLeftChannel(channelId, userId) {
+        try {
+            const user = await User.findOne({ userId });
+            if (!user) return;
+            
+            // Remove channel from subscribed channels
+            user.subscribedChannels = user.subscribedChannels.filter(
+                channel => channel.channelId !== channelId
+            );
+            
+            // Update subscription status
+            const channel = CONFIG.REQUIRED_CHANNELS.find(c => c.id === channelId);
+            if (channel) {
+                // Check if user is still subscribed to other channels
+                const subscription = await this.checkAndUpdateSubscription(null, userId);
+                
+                if (!subscription.isSubscribed && user.isSubscribed) {
+                    // User left a required channel
+                    user.isSubscribed = false;
+                    
+                    // Notify user
+                    return {
+                        shouldNotify: true,
+                        channelName: channel.name,
+                        user
+                    };
+                }
+            }
+            
+            user.lastActivity = new Date();
+            await user.save();
+            
+            await Log.create({
+                level: 'warn',
+                source: 'system',
+                action: 'user_left_channel',
+                userId: userId,
+                message: 'Foydalanuvchi kanaldan chiqdi',
+                details: { channelId }
+            });
+            
+        } catch (error) {
+            console.error('Kanal chiqishini qayta ishlashda xatolik:', error);
+        }
+    }
+    
     static async selectWinner(contestType, adminId, adminUsername) {
         return await Utils.retryOperation(async () => {
             try {
@@ -678,23 +845,29 @@ class DatabaseService {
                 subscribedUsers,
                 iphoneParticipants,
                 redmiParticipants,
+                gentraParticipants,
                 iphoneWinners,
                 redmiWinners,
+                gentraWinners,
                 todayUsers,
-                activeUsers
+                activeUsers,
+                blockedUsers
             ] = await Promise.all([
                 User.countDocuments(),
                 User.countDocuments({ isSubscribed: true }),
                 User.countDocuments({ 'contests.iphone.participated': true, isSubscribed: true }),
                 User.countDocuments({ 'contests.redmi.participated': true, isSubscribed: true }),
+                User.countDocuments({ 'contests.gentra.participated': true, isSubscribed: true }),
                 Winner.countDocuments({ contestType: 'iphone' }),
                 Winner.countDocuments({ contestType: 'redmi' }),
+                Winner.countDocuments({ contestType: 'gentra' }),
                 User.countDocuments({
                     createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
                 }),
                 User.countDocuments({
                     lastActivity: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-                })
+                }),
+                User.countDocuments({ isBlocked: true })
             ]);
             
             return {
@@ -702,12 +875,16 @@ class DatabaseService {
                 subscribedUsers,
                 iphoneParticipants,
                 redmiParticipants,
+                gentraParticipants,
                 iphoneWinners,
                 redmiWinners,
+                gentraWinners,
                 todayUsers,
                 activeUsers,
+                blockedUsers,
                 iphoneRemaining: CONFIG.CONTESTS.IPHONE.prize_count - iphoneWinners,
-                redmiRemaining: CONFIG.CONTESTS.REDMI.prize_count - redmiWinners
+                redmiRemaining: CONFIG.CONTESTS.REDMI.prize_count - redmiWinners,
+                gentraRemaining: CONFIG.CONTESTS.GENTRA.prize_count - gentraWinners
             };
             
         } catch (error) {
@@ -726,10 +903,120 @@ class DatabaseService {
             throw error;
         }
     }
+    
+    static async broadcastMessage(bot, message, filters = {}) {
+        try {
+            let query = {};
+            
+            // Apply filters
+            if (filters.subscribed !== undefined) {
+                query.isSubscribed = filters.subscribed;
+            }
+            
+            if (filters.participatedIn) {
+                query[`contests.${filters.participatedIn}.participated`] = true;
+            }
+            
+            if (filters.minParticipationCount) {
+                query.participationCount = { $gte: filters.minParticipationCount };
+            }
+            
+            // Count users
+            const totalUsers = await User.countDocuments(query);
+            
+            // Create notification record
+            const notification = new Notification({
+                adminId: filters.adminId || 0,
+                adminUsername: filters.adminUsername || 'system',
+                message: message,
+                totalSent: 0,
+                successful: 0,
+                failed: 0,
+                filters: filters,
+                status: 'sending',
+                sentAt: new Date()
+            });
+            
+            await notification.save();
+            
+            let successful = 0;
+            let failed = 0;
+            
+            // Send messages in batches
+            const batchSize = 30;
+            let processed = 0;
+            
+            const users = await User.find(query).select('userId').lean();
+            
+            for (let i = 0; i < users.length; i += batchSize) {
+                const batch = users.slice(i, i + batchSize);
+                
+                const promises = batch.map(async (user) => {
+                    try {
+                        await Utils.sendMessageWithRetry(bot, user.userId, message, {
+                            parse_mode: 'Markdown',
+                            disable_web_page_preview: true
+                        });
+                        successful++;
+                        return { userId: user.userId, success: true };
+                    } catch (error) {
+                        failed++;
+                        return { userId: user.userId, success: false, error: error.message };
+                    }
+                });
+                
+                await Promise.all(promises);
+                processed += batch.length;
+                
+                // Update progress
+                notification.totalSent = processed;
+                notification.successful = successful;
+                notification.failed = failed;
+                await notification.save();
+                
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Complete notification
+            notification.status = 'completed';
+            notification.completedAt = new Date();
+            await notification.save();
+            
+            await Log.create({
+                level: 'info',
+                source: 'admin',
+                action: 'broadcast_sent',
+                adminId: filters.adminId,
+                message: 'Xabar yuborildi',
+                details: {
+                    total: users.length,
+                    successful: successful,
+                    failed: failed
+                }
+            });
+            
+            return {
+                total: users.length,
+                successful,
+                failed
+            };
+            
+        } catch (error) {
+            console.error('Xabar yuborishda xatolik:', error);
+            
+            if (notification) {
+                notification.status = 'failed';
+                await notification.save();
+            }
+            
+            throw error;
+        }
+    }
 }
 
 // ============================
-// 5. BOT SCENES - SIFATLI TAYYORLANGAN
+// 5. BOT SCENES
 // ============================
 class BotScenes {
     static createContestScene(contestType) {
@@ -758,33 +1045,30 @@ class BotScenes {
                 }
                 
                 // Agar allaqachon qatnashgan bo'lsa
-                const hasParticipated = contestType === 'IPHONE' ? 
-                    user.hasParticipatedIphone : user.hasParticipatedRedmi;
+                const hasParticipated = user.contests[contestType.toLowerCase()]?.participated || false;
                 
                 if (hasParticipated) {
-                    const participantId = contestType === 'IPHONE' ? 
-                        user.contests.iphone.participantId : user.contests.redmi.participantId;
+                    const participantId = user.contests[contestType.toLowerCase()]?.participantId;
                     
                     await ctx.reply(
                         'ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n' +
                         'Siz ushbu konkursga allaqachon qatnashgansiz.\n' +
-                        '📝 Sizning ID raqamingiz: ' + (participantId || 'Noma\'lum'),
+                        `📝 Sizning ID raqamingiz: ${participantId || 'Noma\'lum'}`,
                         { parse_mode: 'Markdown' }
                     );
                     return ctx.scene.leave();
                 }
                 
-                // Contest information - Markdown ni to'g'ri ishlatish
+                // Contest information
                 const contestInfo = 
-                    `📱 *${contest.name} KONKURSI*\n\n` +
+                    `${contest.emoji} *${contest.name} KONKURSI*\n\n` +
                     `🎁 ${contest.description}\n\n` +
                     `🎯 *Qatnashish shartlari:*\n` +
                     contest.rules.map((rule, i) => `${i + 1}. ${rule}`).join('\n') + `\n\n` +
                     `🔗 *Sayt:* ${contest.site_url}\n` +
-                    `🔑 *Promokod:* ${contest.promo_code}\n\n` +
+                    `🔑 *Promokod:* \`${contest.promo_code}\`\n\n` +
                     `ID ni yuborish uchun quyidagi tugmani bosing:`;
                 
-                // Escape qilish kerak bo'lgan belgilar
                 const escapedInfo = Utils.escapeMarkdown(contestInfo);
                 
                 await ctx.reply(
@@ -814,7 +1098,11 @@ class BotScenes {
                 await ctx.editMessageText(
                     Utils.escapeMarkdown(
                         '📝 *ID raqamingizni yuboring:*\n\n' +
-                        'Iltimos, saytdan olingan ID raqamingizni yuboring.\n'
+                        'Iltimos, saytdan olingan ID raqamingizni yuboring.\n' +
+                        (contestType.toUpperCase() === 'GENTRA' ? 
+                         'ID "GENTRA" bilan boshlanadi, masalan: GENTRA12345\n\n' :
+                         'ID "150" bilan boshlanadi, masalan: 150123456\n\n') +
+                        '*Eslatma:* ID ni to\'g\'ri kiriting, keyinchalik o\'zgartirib bo\'lmaydi!'
                     ),
                     { 
                         parse_mode: 'MarkdownV2'
@@ -837,23 +1125,17 @@ class BotScenes {
                         } catch (validationError) {
                             console.log(`Validatsiya xatosi: ${validationError.message}`);
                             
-                            // ID 150 bilan boshlanmasa yoki noto'g'ri bo'lsa
-                            if (!participantId.startsWith('150')) {
-                                await ctx.reply(
-                                    Utils.escapeMarkdown(
-                                        '❌ *BU ID ESKIRGAN YOKI NOTO\'G\'RI!*\n\n' +
-                                        'Iltimos, saytga qaytib ro\'yxatdan o\'ting va yangi ID oling!\n'
-                                    ),
-                                    { parse_mode: 'MarkdownV2' }
-                                );
+                            let errorMessage;
+                            if (contestType.toUpperCase() === 'GENTRA') {
+                                errorMessage = '❌ *NOTO\'G\'RI FORMAT!*\n\nID "GENTRA" bilan boshlanishi va raqam bilan davom etishi kerak!\nMasalan: GENTRA12345';
                             } else {
-                                await ctx.reply(
-                                    Utils.escapeMarkdown(
-                                        '❌ *ID ESKIRGAN YOKI NOTO\'G\'RI!*\n\n' 
-                                    ),
-                                    { parse_mode: 'MarkdownV2' }
-                                );
+                                errorMessage = '❌ *NOTO\'G\'RI FORMAT!*\n\nID "150" bilan boshlanishi va faqat raqamlardan iborat bo\'lishi kerak!\nMasalan: 150123456';
                             }
+                            
+                            await ctx.reply(
+                                Utils.escapeMarkdown(errorMessage),
+                                { parse_mode: 'MarkdownV2' }
+                            );
                             
                             // Scene ni qayta kiritish
                             return scene.enter(ctx);
@@ -866,9 +1148,10 @@ class BotScenes {
                             Utils.escapeMarkdown(
                                 '🎉 *TABRIKLAYMIZ!*\n\n' +
                                 'Siz konkursga muvaffaqiyatli qatnashdingiz!\n' +
-                                '📝 Sizning ID raqamingiz: ' + validId + '\n\n' +
+                                `📝 Sizning ID raqamingiz: \`${validId}\`\n\n` +
                                 '🏆 G\'oliblar adminlar tomonidan aniqlanadi va sizga xabar beriladi.\n' +
-                                '🔔 Kutib turing, natijalar yaqin orada e\'lon qilinadi!'
+                                '🔔 Kutib turing, natijalar yaqin orada e\'lon qilinadi!\n\n' +
+                                '⚠️ *Diqqat:* Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!'
                             ),
                             { parse_mode: 'MarkdownV2' }
                         );
@@ -892,8 +1175,7 @@ class BotScenes {
                 scene.on('message', async (ctx) => {
                     if (ctx.message.text) return;
                     await ctx.reply(
-                        '❌ Iltimos, faqat ID raqamini yuboring!\n' +
-                        'ID raqam faqat raqamlardan iborat bo\'lishi kerak.',
+                        '❌ Iltimos, faqat ID raqamini yuboring!',
                         { parse_mode: 'Markdown' }
                     );
                 });
@@ -909,10 +1191,10 @@ class BotScenes {
         });
         
         // Bekor qilish action
-        scene.action(`cancel_${contestType.toLowerCase()}`, (ctx) => {
-            ctx.reply('❌ Konkurs bekor qilindi.');
+        scene.action(`cancel_${contestType.toLowerCase()}`, async (ctx) => {
+            await ctx.editMessageText('❌ Konkurs bekor qilindi.');
             ctx.scene.leave();
-            this.showMainMenu(ctx);
+            await this.showMainMenu(ctx);
         });
         
         return scene;
@@ -934,12 +1216,10 @@ class BotScenes {
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([
                             [Markup.button.callback('📊 Statistika', 'admin_stats')],
-                            // [Markup.button.callback('📱 iPhone g\'oliblari', 'admin_iphone_winners')],
-                            // [Markup.button.callback('📱 Redmi g\'oliblari', 'admin_redmi_winners')],
-                            // [Markup.button.callback('🎯 iPhone g\'olibini aniqlash', 'select_iphone_winner')],
-                            // [Markup.button.callback('🎯 Redmi g\'olibini aniqlash', 'select_redmi_winner')],
-                            // [Markup.button.callback('🔄 Yangilash', 'admin_refresh')],
-                            // [Markup.button.callback('📤 Chiqish', 'exit_admin')]
+                            [Markup.button.callback('📣 Xabar yuborish', 'admin_broadcast')],
+                            [Markup.button.callback('🏆 G\'oliblarni ko\'rish', 'admin_winners')],
+                            [Markup.button.callback('🎯 Tasodifiy g\'olib', 'admin_random_winner')],
+                            [Markup.button.callback('🚪 Chiqish', 'exit_admin')]
                         ])
                     }
                 );
@@ -962,14 +1242,17 @@ class BotScenes {
                 await ctx.editMessageText(
                     `📊 *BOT STATISTIKASI*\n\n` +
                     `👥 *Jami foydalanuvchilar:* ${stats.totalUsers}\n` +
+                    `🚫 *Bloklanganlar:* ${stats.blockedUsers}\n` +
                     `📈 *Bugun qo\'shilgan:* ${stats.todayUsers}\n` +
                     `🔥 *Faol foydalanuvchilar:* ${stats.activeUsers}\n` +
                     `✅ *Obuna bo\'lganlar:* ${stats.subscribedUsers}\n\n` +
                     `📱 *iPhone ishtirokchilar:* ${stats.iphoneParticipants}\n` +
-                    `📱 *Redmi ishtirokchilar:* ${stats.redmiParticipants}\n\n` +
-                    // `🏆 *iPhone g\'oliblari:* ${stats.iphoneWinners}/${CONFIG.CONTESTS.IPHONE.prize_count}\n` +
-                    // `🏆 *Redmi g\'oliblari:* ${stats.redmiWinners}/${CONFIG.CONTESTS.REDMI.prize_count}\n\n` +
-                    // `🕒 *Oxirgi yangilanish:* ${Utils.formatDate(new Date(), 'time')}`,
+                    `📱 *Redmi ishtirokchilar:* ${stats.redmiParticipants}\n` +
+                    `🚗 *Gentra ishtirokchilar:* ${stats.gentraParticipants}\n\n` +
+                    `🏆 *iPhone g\'oliblari:* ${stats.iphoneWinners}/${CONFIG.CONTESTS.IPHONE.prize_count}\n` +
+                    `🏆 *Redmi g\'oliblari:* ${stats.redmiWinners}/${CONFIG.CONTESTS.REDMI.prize_count}\n` +
+                    `🏆 *Gentra g\'oliblari:* ${stats.gentraWinners}/${CONFIG.CONTESTS.GENTRA.prize_count}\n\n` +
+                    `🕒 *Oxirgi yangilanish:* ${Utils.formatDate(new Date(), 'time')}`,
                     { parse_mode: 'Markdown' }
                 );
                 
@@ -977,10 +1260,32 @@ class BotScenes {
                 console.error('Admin stats error:', error);
                 await ctx.answerCbQuery('❌ Statistika olishda xatolik!');
             }
-            ctx.answerCbQuery();
         });
         
-        // ... Admin scene qolgan qismlari (oldingi kodda bor)
+        scene.action('admin_broadcast', async (ctx) => {
+            try {
+                await ctx.editMessageText(
+                    '📣 *XABAR YUBORISH*\n\n' +
+                    'Xabarni kimlarga yubormoqchisiz?',
+                    {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback('✅ Barcha obunachilar', 'broadcast_subscribed')],
+                            [Markup.button.callback('👥 Barcha foydalanuvchilar', 'broadcast_all')],
+                            [Markup.button.callback('📱 iPhone ishtirokchilar', 'broadcast_iphone')],
+                            [Markup.button.callback('📱 Redmi ishtirokchilar', 'broadcast_redmi')],
+                            [Markup.button.callback('🚗 Gentra ishtirokchilar', 'broadcast_gentra')],
+                            [Markup.button.callback('🔙 Orqaga', 'back_to_admin')]
+                        ])
+                    }
+                );
+            } catch (error) {
+                console.error('Broadcast menu error:', error);
+                await ctx.answerCbQuery('❌ Xatolik yuz berdi!');
+            }
+        });
+        
+        // ... O'xshash admin scene qolgan qismlari
         
         return scene;
     }
@@ -989,13 +1294,14 @@ class BotScenes {
         try {
             await ctx.reply(
                 '🏠 *ASOSIY MENYU*\n\n' +
-                'Quyidagi menyudan kerakli amalni tanlang:',
+                'Quyidagi konkurslardan birini tanlang:',
                 {
                     parse_mode: 'Markdown',
                     ...Markup.keyboard([
-                        ['📋 Konkurs haqida'],
-                        ['📱 iPhone 17 Pro Max'],
-                        ['📱 Redmi']
+                        [CONFIG.CONTESTS.IPHONE.button_text],
+                        [CONFIG.CONTESTS.REDMI.button_text],
+                        [CONFIG.CONTESTS.GENTRA.button_text],
+                        ['📋 Konkurs haqida', '🔄 Obunani tekshirish']
                     ])
                     .resize()
                     .oneTime()
@@ -1008,15 +1314,29 @@ class BotScenes {
     
     static async showChannelButtons(ctx, channels) {
         try {
-            const buttons = channels.map(channel => 
-                [Markup.button.url(`📢 ${channel.name}`, channel.url)]
-            );
+            const buttons = channels.map(channel => {
+                if (channel.requires_admin) {
+                    return [Markup.button.url(`👑 ${channel.name} (ADMIN bo\'lish)`, channel.url)];
+                }
+                return [Markup.button.url(`📢 ${channel.name}`, channel.url)];
+            });
             
             buttons.push([Markup.button.callback('✅ Obunani tekshirish', 'check_subscription')]);
             
+            const message = channels.some(c => c.requires_admin) ?
+                '*DIQQAT!*\n\n' +
+                'Ba\'zi kanallar uchun ADMIN bo\'lish talab qilinadi:\n\n' +
+                '1. Senator 18+\n' +
+                '2. Senator 19+\n\n' +
+                'Ushbu kanallarga obuna bo\'lish uchun admin bo\'lishingiz kerak!' :
+                'Botdan to\'liq foydalanish uchun quyidagi kanallarga obuna bo\'ling:';
+            
             await ctx.reply(
-                'Obuna bo\'lish uchun quyidagi tugmalardan foydalaning:',
-                Markup.inlineKeyboard(buttons)
+                Utils.escapeMarkdown(message),
+                {
+                    parse_mode: 'MarkdownV2',
+                    ...Markup.inlineKeyboard(buttons)
+                }
             );
         } catch (error) {
             console.error('Channel buttons error:', error);
@@ -1048,9 +1368,10 @@ class SenatorBot {
             // Create scenes
             const iphoneScene = BotScenes.createContestScene('IPHONE');
             const redmiScene = BotScenes.createContestScene('REDMI');
+            const gentraScene = BotScenes.createContestScene('GENTRA');
             const adminScene = BotScenes.createAdminScene();
             
-            this.scenes = [iphoneScene, redmiScene, adminScene];
+            this.scenes = [iphoneScene, redmiScene, gentraScene, adminScene];
             this.stage = new Scenes.Stage(this.scenes);
             
             // Setup middleware
@@ -1063,11 +1384,17 @@ class SenatorBot {
                     await next();
                 } catch (error) {
                     console.error('Bot error:', error);
+                    Utils.logToFile('error', 'Bot middleware error', { error: error.message });
+                    
                     try {
-                        await ctx.reply(
-                            '⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko\'ring.',
-                            { parse_mode: 'Markdown' }
-                        );
+                        if (ctx.callbackQuery) {
+                            await ctx.answerCbQuery('⚠️ Xatolik yuz berdi. Keyinroq urinib ko\'ring.');
+                        } else if (ctx.message) {
+                            await ctx.reply(
+                                '⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko\'ring.',
+                                { parse_mode: 'Markdown' }
+                            );
+                        }
                     } catch (e) {
                         console.error('Error reply failed:', e);
                     }
@@ -1076,17 +1403,16 @@ class SenatorBot {
             
             // Setup user middleware
             this.bot.use(async (ctx, next) => {
-                if (ctx.message && ctx.message.text) {
+                if (ctx.message || ctx.callbackQuery) {
                     await DatabaseService.findOrCreateUser(ctx);
                 }
                 await next();
             });
             
-            // Register commands
+            // Register commands and handlers
             this.registerCommands();
-            
-            // Register actions
             this.registerActions();
+            this.registerEventHandlers();
             
             this.initialized = true;
             console.log('✅ Bot muvaffaqiyatli ishga tushirildi!');
@@ -1122,7 +1448,8 @@ class SenatorBot {
                         '🎉 *SENATOR KONKURS BOTIGA XUSH KELIBSIZ!*\n\n' +
                         'Bu bot orqali siz quyidagi sovg\'alarni yutib olishingiz mumkin:\n' +
                         '🏆 5 ta iPhone 17 Pro Max\n' +
-                        '🏆 10 ta Redmi telefon\n\n' +
+                        '🏆 10 ta Redmi telefon\n' +
+                        '🏆 1 ta Chevrolet Gentra avtomobil\n\n' +
                         'Botdan foydalanish uchun avval quyidagi kanallarga obuna bo\'ling:',
                         { parse_mode: 'Markdown' }
                     );
@@ -1160,7 +1487,8 @@ class SenatorBot {
                 '🏆 *KONKURS HAQIDA MA\'LUMOT*\n\n' +
                 '🎁 *Sovg\'alar:*\n' +
                 '• 5 ta iPhone 17 Pro Max\n' +
-                '• 10 ta Redmi telefon\n\n' +
+                '• 10 ta Redmi telefon\n' +
+                '• 1 ta Chevrolet Gentra avtomobil\n\n' +
                 '📱 *iPhone 17 Pro Max yutish uchun:*\n' +
                 '1. Saytga kirish\n' +
                 '2. Promokod: SENATOR\n' +
@@ -1171,9 +1499,39 @@ class SenatorBot {
                 '2. Promokod: SENATOR\n' +
                 '3. Ro\'yxatdan o\'tish\n' +
                 '4. ID ni yuborish\n\n' +
-                '🚀 *Har bir foydalanuvchi faqat bir marta qatnashishi mumkin!*',
+                '🚗 *Gentra yutish uchun:*\n' +
+                '1. Saytga kirish\n' +
+                '2. Promokod: SENATOR2024\n' +
+                '3. Ariza to\'ldirish\n' +
+                '4. ID ni yuborish\n\n' +
+                '⚠️ *DIQQAT!*\n' +
+                '• Har bir foydalanuvchi faqat bir marta qatnashishi mumkin!\n' +
+                '• Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!\n' +
+                '• Ba\'zi kanallarga ADMIN bo\'lish talab qilinadi!',
                 { parse_mode: 'Markdown' }
             );
+        });
+        
+        // Stats command
+        this.bot.command('stats', async (ctx) => {
+            if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) {
+                return ctx.reply('❌ Siz admin emassiz!');
+            }
+            
+            try {
+                const stats = await DatabaseService.getStatistics();
+                await ctx.reply(
+                    `📊 Statistika:\n\n` +
+                    `Jami: ${stats.totalUsers}\n` +
+                    `Obuna: ${stats.subscribedUsers}\n` +
+                    `iPhone: ${stats.iphoneParticipants}\n` +
+                    `Redmi: ${stats.redmiParticipants}\n` +
+                    `Gentra: ${stats.gentraParticipants}`,
+                    { parse_mode: 'Markdown' }
+                );
+            } catch (error) {
+                console.error('Stats command error:', error);
+            }
         });
     }
     
@@ -1181,6 +1539,7 @@ class SenatorBot {
         // Check subscription action
         this.bot.action('check_subscription', async (ctx) => {
             try {
+                await ctx.answerCbQuery();
                 const userId = ctx.from.id;
                 const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
                 
@@ -1205,16 +1564,29 @@ class SenatorBot {
                 console.error('Check subscription error:', error);
                 await ctx.answerCbQuery('❌ Xatolik yuz berdi!');
             }
-            ctx.answerCbQuery();
         });
         
-        // Contest info
+        // Contest buttons
+        this.bot.hears(CONFIG.CONTESTS.IPHONE.button_text, async (ctx) => {
+            await this.handleContestButton(ctx, 'IPHONE');
+        });
+        
+        this.bot.hears(CONFIG.CONTESTS.REDMI.button_text, async (ctx) => {
+            await this.handleContestButton(ctx, 'REDMI');
+        });
+        
+        this.bot.hears(CONFIG.CONTESTS.GENTRA.button_text, async (ctx) => {
+            await this.handleContestButton(ctx, 'GENTRA');
+        });
+        
+        // Other buttons
         this.bot.hears('📋 Konkurs haqida', async (ctx) => {
             await ctx.reply(
                 '🏆 *KONKURS HAQIDA MA\'LUMOT*\n\n' +
                 '🎁 *Sovg\'alar:*\n' +
                 '• 5 ta iPhone 17 Pro Max\n' +
-                '• 10 ta Redmi telefon\n\n' +
+                '• 10 ta Redmi telefon\n' +
+                '• 1 ta Chevrolet Gentra avtomobil\n\n' +
                 '📱 *iPhone 17 Pro Max yutish uchun:*\n' +
                 '1. Saytga kirish\n' +
                 '2. Promokod: SENATOR\n' +
@@ -1225,84 +1597,236 @@ class SenatorBot {
                 '2. Promokod: SENATOR\n' +
                 '3. Ro\'yxatdan o\'tish\n' +
                 '4. ID ni yuborish\n\n' +
-                '🚀 *Har bir foydalanuvchi faqat bir marta qatnashishi mumkin!*',
+                '🚗 *Gentra yutish uchun:*\n' +
+                '1. Saytga kirish\n' +
+                '2. Promokod: SENATOR2024\n' +
+                '3. Ariza to\'ldirish\n' +
+                '4. ID ni yuborish\n\n' +
+                '⚠️ *DIQQAT!*\n' +
+                '• Har bir foydalanuvchi faqat bir marta qatnashishi mumkin!\n' +
+                '• Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!\n' +
+                '• Ba\'zi kanallarga ADMIN bo\'lish talab qilinadi!',
                 { parse_mode: 'Markdown' }
             );
         });
         
-        // iPhone contest
-        this.bot.hears('📱 iPhone 17 Pro Max', async (ctx) => {
+        this.bot.hears('🔄 Obunani tekshirish', async (ctx) => {
             const userId = ctx.from.id;
+            const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
             
-            try {
-                const user = await User.findOne({ userId });
-                const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
-                
-                if (!subscription.isSubscribed) {
-                    await ctx.reply(
-                        '❌ Avval barcha kanallarga obuna bo\'ling!',
-                        { parse_mode: 'Markdown' }
-                    );
-                    await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
-                    return;
-                }
-                
-                if (user && user.hasParticipatedIphone) {
-                    await ctx.reply(
-                        'ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n' +
-                        'Siz ushbu konkursga allaqachon qatnashgansiz.\n' +
-                        '📝 Sizning ID raqamingiz: ' + (user.contests.iphone.participantId || 'Noma\'lum'),
-                        { parse_mode: 'Markdown' }
-                    );
-                    return;
-                }
-                
-                ctx.scene.enter('iphone');
-                
-            } catch (error) {
-                console.error('iPhone contest error:', error);
+            if (subscription.notSubscribed.length > 0) {
                 await ctx.reply(
-                    '⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko\'ring.',
+                    '❌ *SIZ BARCHA KANALLARGA OBUNA BO\'LMAGANSIZ!*\n\n' +
+                    'Quyidagi kanallarga obuna bo\'lishingiz kerak:',
+                    { parse_mode: 'Markdown' }
+                );
+                await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
+            } else {
+                await ctx.reply(
+                    '✅ *BARCHA KANALLARGA OBUNA BO\'LGANSIZ!*\n\n' +
+                    'Siz konkurslarda qatnashishingiz mumkin.',
                     { parse_mode: 'Markdown' }
                 );
             }
         });
+    }
+    
+    async handleContestButton(ctx, contestType) {
+        const userId = ctx.from.id;
         
-        // Redmi contest
-        this.bot.hears('📱 Redmi', async (ctx) => {
-            const userId = ctx.from.id;
+        try {
+            const user = await User.findOne({ userId });
+            const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
             
-            try {
-                const user = await User.findOne({ userId });
-                const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
-                
-                if (!subscription.isSubscribed) {
-                    await ctx.reply(
-                        '❌ Avval barcha kanallarga obuna bo\'ling!',
-                        { parse_mode: 'Markdown' }
-                    );
-                    await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
-                    return;
-                }
-                
-                if (user && user.hasParticipatedRedmi) {
-                    await ctx.reply(
-                        'ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n' +
-                        'Siz ushbu konkursga allaqachon qatnashgansiz.\n' +
-                        '📝 Sizning ID raqamingiz: ' + (user.contests.redmi.participantId || 'Noma\'lum'),
-                        { parse_mode: 'Markdown' }
-                    );
-                    return;
-                }
-                
-                ctx.scene.enter('redmi');
-                
-            } catch (error) {
-                console.error('Redmi contest error:', error);
+            if (!subscription.isSubscribed) {
                 await ctx.reply(
-                    '⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko\'ring.',
+                    '❌ Avval barcha kanallarga obuna bo\'ling!',
                     { parse_mode: 'Markdown' }
                 );
+                await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
+                return;
+            }
+            
+            if (user && user.contests[contestType.toLowerCase()]?.participated) {
+                const participantId = user.contests[contestType.toLowerCase()]?.participantId;
+                await ctx.reply(
+                    'ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n' +
+                    'Siz ushbu konkursga allaqachon qatnashgansiz.\n' +
+                    `📝 Sizning ID raqamingiz: ${participantId || 'Noma\'lum'}`,
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+            
+            ctx.scene.enter(contestType.toLowerCase());
+            
+        } catch (error) {
+            console.error(`${contestType} contest error:`, error);
+            await ctx.reply(
+                '⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko\'ring.',
+                { parse_mode: 'Markdown' }
+            );
+        }
+    }
+    
+    registerEventHandlers() {
+        // Handle chat member updates (user leaving/joining channels)
+        this.bot.on('chat_member', async (ctx) => {
+            try {
+                const chatMember = ctx.chatMember;
+                const userId = chatMember.new_chat_member.user.id;
+                const chatId = chatMember.chat.id;
+                
+                // Check if this is one of our monitored channels
+                const channel = CONFIG.REQUIRED_CHANNELS.find(c => c.id === chatId.toString());
+                if (!channel) return;
+                
+                const oldStatus = chatMember.old_chat_member.status;
+                const newStatus = chatMember.new_chat_member.status;
+                
+                // User left the channel
+                if ((oldStatus === 'member' || oldStatus === 'administrator') && 
+                    (newStatus === 'left' || newStatus === 'kicked')) {
+                    
+                    console.log(`👋 User ${userId} left channel ${channel.name}`);
+                    
+                    const result = await DatabaseService.handleUserLeftChannel(chatId, userId);
+                    
+                    // Notify user if they were subscribed
+                    if (result && result.shouldNotify) {
+                        try {
+                            await this.bot.telegram.sendMessage(
+                                userId,
+                                `⚠️ *DIQQAT!*\n\n` +
+                                `Siz "${result.channelName}" kanalidan chiqdingiz!\n\n` +
+                                `❌ Bu sababli siz konkurslardan chetlashtirildingiz!\n\n` +
+                                `Qayta qatnashish uchun kanalga qayta obuna bo'ling:`,
+                                {
+                                    parse_mode: 'Markdown',
+                                    ...Markup.inlineKeyboard([
+                                        [Markup.button.url(`📢 ${channel.name}ga qaytish`, channel.url)],
+                                        [Markup.button.callback('🔄 Obunani tekshirish', 'check_subscription')]
+                                    ])
+                                }
+                            );
+                        } catch (error) {
+                            console.error('Foydalanuvchiga xabar yuborishda xatolik:', error);
+                        }
+                    }
+                }
+                
+                // User joined the channel
+                if ((oldStatus === 'left' || oldStatus === 'kicked') && 
+                    (newStatus === 'member' || newStatus === 'administrator')) {
+                    
+                    console.log(`👋 User ${userId} joined channel ${channel.name}`);
+                    
+                    // Check if user is now subscribed to all channels
+                    const subscription = await DatabaseService.checkAndUpdateSubscription(this.bot.telegram, userId);
+                    
+                    if (subscription.isSubscribed) {
+                        try {
+                            await this.bot.telegram.sendMessage(
+                                userId,
+                                '✅ *BARCHA KANALLARGA OBUNA BO\'LDINGIZ!*\n\n' +
+                                'Endi konkurslarda qatnashishingiz mumkin.\n' +
+                                'Quyidagi menyudan kerakli konkursni tanlang:',
+                                { parse_mode: 'Markdown' }
+                            );
+                            
+                            await BotScenes.showMainMenu({ reply: (text, options) => 
+                                this.bot.telegram.sendMessage(userId, text, options) 
+                            });
+                            
+                        } catch (error) {
+                            console.error('Qayta obuna xabarini yuborishda xatolik:', error);
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Chat member update error:', error);
+            }
+        });
+        
+        // Handle join requests
+        this.bot.on('chat_join_request', async (ctx) => {
+            try {
+                const request = ctx.chatJoinRequest;
+                const userId = request.from.id;
+                const chatId = request.chat.id;
+                
+                // Check if this is one of our monitored private channels
+                const channel = CONFIG.REQUIRED_CHANNELS.find(c => 
+                    c.id === chatId.toString() && c.type === 'private'
+                );
+                
+                if (!channel) return;
+                
+                console.log(`🔔 Join request from ${userId} to ${channel.name}`);
+                
+                // Check if user is admin in required admin channels
+                let isAdminInAll = true;
+                
+                for (const reqChannel of CONFIG.REQUIRED_CHANNELS.filter(c => c.requires_admin)) {
+                    try {
+                        const member = await this.bot.telegram.getChatMember(reqChannel.id, userId);
+                        
+                        if (member.status !== 'administrator' && member.status !== 'creator') {
+                            isAdminInAll = false;
+                            break;
+                        }
+                    } catch (error) {
+                        console.log(`Admin tekshirishda xatolik (${reqChannel.name}):`, error.message);
+                        isAdminInAll = false;
+                        break;
+                    }
+                }
+                
+                try {
+                    if (isAdminInAll) {
+                        await ctx.approveChatJoinRequest();
+                        console.log(`✅ QABUL QILINDI: ${userId} (admin)`);
+                        
+                        // Send welcome message
+                        try {
+                            await this.bot.telegram.sendMessage(
+                                userId,
+                                `✅ *QABUL QILINDI!*\n\n` +
+                                `Siz "${channel.name}" kanaliga qabul qilindingiz!\n\n` +
+                                `Endi boshqa kanallarga ham obuna bo\'lishingizni tekshirib ko\'ring.`,
+                                { parse_mode: 'Markdown' }
+                            );
+                        } catch (error) {
+                            console.error('Qabul xabarini yuborishda xatolik:', error);
+                        }
+                        
+                    } else {
+                        await ctx.declineChatJoinRequest();
+                        console.log(`❌ RAD ETILDI: ${userId} (admin emas)`);
+                        
+                        // Send rejection message
+                        try {
+                            await this.bot.telegram.sendMessage(
+                                userId,
+                                `❌ *JOIN REQUEST RAD ETILDI!*\n\n` +
+                                `Siz "${channel.name}" kanaliga qabul qilinmadingiz!\n\n` +
+                                `*Sabab:* Siz quyidagi kanallarda ADMIN emassiz:\n` +
+                                `• Senator 18+\n` +
+                                `• Senator 19+\n\n` +
+                                `Iltimos, avval ushbu kanallarga ADMIN bo\'ling, keyin qayta urinib ko\'ring!`,
+                                { parse_mode: 'Markdown' }
+                            );
+                        } catch (error) {
+                            console.error('Rad etish xabarini yuborishda xatolik:', error);
+                        }
+                    }
+                } catch (err) {
+                    console.log("❌ Requestni qabul/rad etishda xato:", err.message);
+                }
+                
+            } catch (error) {
+                console.error('Join request handler error:', error);
             }
         });
     }
@@ -1315,7 +1839,13 @@ class SenatorBot {
         try {
             await this.bot.launch({
                 dropPendingUpdates: true,
-                allowedUpdates: ['message', 'callback_query', 'chat_member', 'my_chat_member']
+                allowedUpdates: [
+                    'message', 
+                    'callback_query', 
+                    'chat_member', 
+                    'my_chat_member',
+                    'chat_join_request'
+                ]
             });
             
             const botInfo = await this.bot.telegram.getMe();
@@ -1326,8 +1856,29 @@ class SenatorBot {
             
             console.log(`👑 Adminlar: ${CONFIG.ADMIN_IDS.join(', ')}`);
             console.log(`📊 Kanallar: ${CONFIG.REQUIRED_CHANNELS.length} ta`);
-            console.log(`📱 Sovg\'alar: ${CONFIG.CONTESTS.IPHONE.prize_count} iPhone, ${CONFIG.CONTESTS.REDMI.prize_count} Redmi`);
+            console.log(`📱 Sovg\'alar: ${CONFIG.CONTESTS.IPHONE.prize_count} iPhone, ${CONFIG.CONTESTS.REDMI.prize_count} Redmi, ${CONFIG.CONTESTS.GENTRA.prize_count} Gentra`);
             console.log('🚀 Bot faol va ishlamoqda...');
+            
+            // Periodic subscription check
+            setInterval(async () => {
+                try {
+                    console.log('🔄 Foydalanuvchilarning obuna holati tekshirilmoqda...');
+                    const users = await User.find({ 
+                        isSubscribed: true,
+                        lastActivity: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                    }).limit(100);
+                    
+                    for (const user of users) {
+                        try {
+                            await DatabaseService.checkAndUpdateSubscription(this.bot.telegram, user.userId);
+                        } catch (error) {
+                            console.error(`User ${user.userId} tekshirishda xatolik:`, error.message);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Periodic check error:', error);
+                }
+            }, CONFIG.SETTINGS.subscription_check_interval);
             
         } catch (error) {
             console.error('❌ Botni ishga tushirishda xatolik:', error);
@@ -1379,5 +1930,6 @@ module.exports = {
     CONFIG,
     User,
     Winner,
-    Log
+    Log,
+    Notification
 };
