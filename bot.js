@@ -120,7 +120,7 @@ const CONFIG = {
             description: '1 ta Chevrolet Gentra avtomobil sovg\'a qilinadi!',
             rules: [
                 'Saytga ro\'yxatdan o\'ting',
-                'Promokod: SENATOR2024',
+                'Promokod: SENATOR',
                 'Avtomobil uchun ariza to\'ldiring',
                 'ID raqamingizni oling'
             ],
