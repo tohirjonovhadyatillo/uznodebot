@@ -37,7 +37,7 @@ const CONFIG = {
     ? process.env.ADMIN_IDS.split(",").map((id) => parseInt(id.trim()))
     : [6873603981, 296801391],
 
-  // Channels Configuration
+  // Channels Configuration - YANGILANDI
   REQUIRED_CHANNELS: [
     {
       id: "@SENATOR_PUBGM",
@@ -48,26 +48,26 @@ const CONFIG = {
     },
     {
       id: "-1002226075129",
-      name: "Senator 18+",
+      name: "На Чиле +18",
       url: "https://t.me/+4byxN4zF6vJhNDZi",
       type: "private",
       invite_link: "https://t.me/+4byxN4zF6vJhNDZi",
-      requires_admin: true, // Bu kanalga admin bo'lish kerak
+      requires_admin: true,
     },
     {
       id: "@senatorazart",
-      name: "Senator Azart",
+      name: "SENATOR 19+",
       url: "https://t.me/senatorazart",
       type: "public",
       username: "@senatorazart",
     },
     {
       id: "-1002027973620",
-      name: "Senator 19+",
+      name: "Senator 18+",
       url: "https://t.me/+0IhgHgHljec1M2Zi",
       type: "private",
       invite_link: "https://t.me/+0IhgHgHljec1M2Zi",
-      requires_admin: true, // Bu kanalga admin bo'lish kerak
+      requires_admin: true,
     },
     {
       id: "@SENATORKUPON",
@@ -75,6 +75,20 @@ const CONFIG = {
       url: "https://t.me/SENATORKUPON",
       type: "public",
       username: "@SENATORKUPON",
+    },
+    {
+      id: "@senatorkuponchik",
+      name: "Senator Kuponchik",
+      url: "https://t.me/senatorkuponchik",
+      type: "public",
+      username: "@senatorkuponchik",
+    },
+    {
+      id: "@DangerEsportsFamily",
+      name: "Danger Esports Family",
+      url: "https://t.me/DangerEsportsFamily",
+      type: "public",
+      username: "@DangerEsportsFamily",
     },
   ],
 
@@ -136,16 +150,18 @@ const CONFIG = {
     },
   },
 
-  // Bot Behavior Configuration
+  // Bot Behavior Configuration - YANGILANDI (rate limit uchun)
   SETTINGS: {
     subscription_check_interval: 300000, // 5 daqiqa
     max_retries: 3,
     request_timeout: 10000,
     cache_duration: 300000, // 5 minutes
     max_users_per_day: 1000,
-    max_requests_per_minute: 30,
+    max_requests_per_minute: 20, // 30 dan 20 ga tushirildi (Telegram limiti)
     maintenance_mode: false,
     debug_mode: process.env.NODE_ENV === "development",
+    broadcast_batch_size: 15, // Yangi: Batch o'lchami kamaytirildi
+    broadcast_delay: 1500, // Yangi: Batchlar orasidagi kutish (ms)
   },
 
   // File Paths
@@ -530,7 +546,7 @@ class Utils {
 }
 
 // ============================
-// 4. DATABASE SERVICE
+// 4. DATABASE SERVICE - YANGILANDI (Broadcast fix)
 // ============================
 class DatabaseService {
   static async initialize() {
@@ -569,6 +585,20 @@ class DatabaseService {
         error: error.message,
       });
       throw error;
+    }
+  }
+
+  static async checkConnection() {
+    try {
+      if (mongoose.connection.readyState !== 1) {
+        console.log("⚠️ MongoDB ulanmagan, qayta ulanmoqda...");
+        await mongoose.connect(CONFIG.MONGODB_URI, CONFIG.MONGODB_OPTIONS);
+        console.log("✅ MongoDB qayta ulandi");
+      }
+      return true;
+    } catch (error) {
+      console.error("❌ MongoDB qayta ulanishda xatolik:", error);
+      return false;
     }
   }
 
@@ -1013,31 +1043,13 @@ class DatabaseService {
     }
   }
 
-    static async tgCallWithRetry(fn, maxRetries = 3) {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await fn();
-      } catch (e) {
-        const code = e?.response?.error_code || e?.code;
-        const retryAfter = e?.response?.parameters?.retry_after;
-
-        // 429 bo'lsa kutib qayta urinadi
-        if (code === 429 || String(code) === "429") {
-          const waitSec = retryAfter || 2;
-          await new Promise((r) => setTimeout(r, waitSec * 1000));
-          continue;
-        }
-
-        throw e;
-      }
-    }
-  }
-
-
   static async broadcastMessage(bot, adminMessage, filters = {}) {
     let notification;
 
     try {
+      // MongoDB ulanishini tekshirish
+      await this.checkConnection();
+
       let query = {};
       if (filters.subscribed !== undefined)
         query.isSubscribed = filters.subscribed;
@@ -1046,12 +1058,16 @@ class DatabaseService {
       if (filters.minParticipationCount)
         query.participationCount = { $gte: filters.minParticipationCount };
 
-      const users = await User.find(query).select("userId isBlocked").lean();
+      // Faqat active va blocked bo'lmagan userlarni olish
+      query.isBlocked = false;
+      query.isActive = true;
+
+      const users = await User.find(query).select("userId").lean();
 
       notification = new Notification({
         adminId: filters.adminId || 0,
         adminUsername: filters.adminUsername || "admin",
-        message: "[BROADCAST]",
+        message: adminMessage.text || adminMessage.caption || "[BROADCAST]",
         totalSent: 0,
         successful: 0,
         failed: 0,
@@ -1063,80 +1079,217 @@ class DatabaseService {
 
       let successful = 0;
       let failed = 0;
-      const batchSize = 25;
+      const batchSize = CONFIG.SETTINGS.broadcast_batch_size || 15;
+      const delayBetweenBatches = CONFIG.SETTINGS.broadcast_delay || 1500;
 
-      const isPoll = !!adminMessage.poll;
+      console.log(
+        `📤 Broadcast boshlanmoqda: ${users.length} ta foydalanuvchi`,
+      );
 
       for (let i = 0; i < users.length; i += batchSize) {
         const batch = users.slice(i, i + batchSize);
+        console.log(`📦 Batch ${Math.floor(i / batchSize) + 1}: ${batch.length} ta user`);
 
-        await Promise.all(
-          batch.map(async (u) => {
-            if (u.isBlocked) {
-              failed++;
-              return;
+        const batchPromises = batch.map(async (user) => {
+          try {
+            // Telegram ID ni to'g'ri formatlash
+            const chatId = String(user.userId);
+            
+            // Xabarni nusxalash
+            if (adminMessage.poll) {
+              // Poll yuborish
+              const poll = adminMessage.poll;
+              await bot.telegram.sendPoll(
+                chatId,
+                poll.question,
+                poll.options,
+                {
+                  is_anonymous: poll.is_anonymous || false,
+                  type: poll.type || "regular",
+                  allows_multiple_answers:
+                    poll.allows_multiple_answers || false,
+                  correct_option_id: poll.correct_option_id,
+                  explanation: poll.explanation,
+                  open_period: poll.open_period,
+                  close_date: poll.close_date,
+                },
+              );
+            } else if (adminMessage.photo) {
+              // Rasm yuborish
+              await bot.telegram.sendPhoto(
+                chatId,
+                adminMessage.photo[adminMessage.photo.length - 1].file_id,
+                {
+                  caption: adminMessage.caption,
+                  parse_mode: adminMessage.parse_mode,
+                  caption_entities: adminMessage.caption_entities,
+                },
+              );
+            } else if (adminMessage.video) {
+              // Video yuborish
+              await bot.telegram.sendVideo(
+                chatId,
+                adminMessage.video.file_id,
+                {
+                  caption: adminMessage.caption,
+                  parse_mode: adminMessage.parse_mode,
+                  caption_entities: adminMessage.caption_entities,
+                },
+              );
+            } else if (adminMessage.document) {
+              // Hujjat yuborish
+              await bot.telegram.sendDocument(
+                chatId,
+                adminMessage.document.file_id,
+                {
+                  caption: adminMessage.caption,
+                  parse_mode: adminMessage.parse_mode,
+                  caption_entities: adminMessage.caption_entities,
+                },
+              );
+            } else if (adminMessage.audio) {
+              // Audio yuborish
+              await bot.telegram.sendAudio(
+                chatId,
+                adminMessage.audio.file_id,
+                {
+                  caption: adminMessage.caption,
+                  parse_mode: adminMessage.parse_mode,
+                  caption_entities: adminMessage.caption_entities,
+                },
+              );
+            } else if (adminMessage.voice) {
+              // Ovozli xabar yuborish
+              await bot.telegram.sendVoice(
+                chatId,
+                adminMessage.voice.file_id,
+                {
+                  caption: adminMessage.caption,
+                  parse_mode: adminMessage.parse_mode,
+                  caption_entities: adminMessage.caption_entities,
+                },
+              );
+            } else if (adminMessage.sticker) {
+              // Sticker yuborish
+              await bot.telegram.sendSticker(
+                chatId,
+                adminMessage.sticker.file_id,
+              );
+            } else {
+              // Oddiy matn yuborish
+              await bot.telegram.sendMessage(chatId, adminMessage.text, {
+                parse_mode: adminMessage.parse_mode,
+                entities: adminMessage.entities,
+                disable_web_page_preview: adminMessage.disable_web_page_preview,
+              });
             }
 
-            try {
-              if (isPoll) {
-                const p = adminMessage.poll;
+            successful++;
+            console.log(`✅ ${chatId}: Xabar yuborildi`);
+            
+            // Har bir muvaffaqiyatli yuborishdan keyin kichik kutish
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+          } catch (error) {
+            failed++;
 
-                await DatabaseService.tgCallWithRetry(() =>
-                  bot.sendPoll(
-                    u.userId,
-                    p.question,
-                    p.options.map((o) => o.text),
-                    {
-                      is_anonymous: p.is_anonymous,
-                      type: p.type,
-                      allows_multiple_answers: p.allows_multiple_answers,
-                    },
-                  ),
-                );
-              } else {
-                await DatabaseService.tgCallWithRetry(() =>
-                  bot.copyMessage(
-                    u.userId,
-                    adminMessage.chat.id,
-                    adminMessage.message_id,
-                  ),
-                );
-              }
-
-              successful++;
-            } catch (e) {
-              failed++;
-
-              const msg = (e.description || e.message || "").toLowerCase();
-              if (
-                msg.includes("bot was blocked") ||
-                msg.includes("forbidden") ||
-                String(e.code || "").includes("403")
-              ) {
+            // Bloklangan foydalanuvchilarni belgilash
+            const errorMessage = error.message || error.toString();
+            if (
+              errorMessage.includes("bot was blocked") ||
+              errorMessage.includes("Forbidden") ||
+              errorMessage.includes("user is deactivated") ||
+              error.code === 403 ||
+              error.response?.error_code === 403
+            ) {
+              try {
                 await User.updateOne(
-                  { userId: u.userId },
-                  { $set: { isBlocked: true, isActive: false } },
-                ).catch(() => {});
+                  { userId: user.userId },
+                  {
+                    $set: {
+                      isBlocked: true,
+                      isActive: false,
+                      blockReason: "Bot blocked by user",
+                    },
+                  },
+                );
+                console.log(`❌ ${user.userId}: Bot bloklangan (blocked)`);
+              } catch (dbError) {
+                console.log(`❌ DB update xatosi: ${dbError.message}`);
               }
+            } else if (
+              errorMessage.includes("Too Many Requests") ||
+              error.code === 429 ||
+              error.response?.error_code === 429
+            ) {
+              console.log(`⚠️ ${user.userId}: Rate limit (429)`);
+              
+              // Agar rate limit bo'lsa, kutilayotgan vaqtni olish
+              const retryAfter = error.response?.parameters?.retry_after || 2;
+              console.log(`⏳ ${retryAfter} soniya kutmoqda...`);
+              await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+              
+              // Qayta urinish
+              try {
+                await bot.telegram.sendMessage(String(user.userId), adminMessage.text, {
+                  parse_mode: adminMessage.parse_mode,
+                  entities: adminMessage.entities,
+                  disable_web_page_preview: adminMessage.disable_web_page_preview,
+                });
+                successful++;
+                failed--;
+                console.log(`✅ ${user.userId}: Qayta urinish muvaffaqiyatli`);
+              } catch (retryError) {
+                console.log(`❌ ${user.userId}: Qayta urinish ham muvaffaqiyatsiz`);
+              }
+            } else {
+              console.log(`❌ ${user.userId}: ${errorMessage}`);
             }
-          }),
-        );
+            
+            // Log faylga yozish
+            await Utils.logToFile("error", `Broadcast xatosi: ${user.userId}`, {
+              error: errorMessage,
+              code: error.code,
+            });
+          }
+        });
 
+        // Batch dagi barcha promiselarni bajarish
+        await Promise.allSettled(batchPromises);
+
+        // MongoDB ulanishini qayta tekshirish
+        await this.checkConnection();
+
+        // Statistikani yangilash
         notification.totalSent = Math.min(i + batchSize, users.length);
         notification.successful = successful;
         notification.failed = failed;
         await notification.save();
 
-        await new Promise((r) => setTimeout(r, 900));
+        // Batchlar orasida kutish (rate limit uchun)
+        if (i + batchSize < users.length) {
+          console.log(`⏳ ${delayBetweenBatches}ms kutmoqda...`);
+          await new Promise((resolve) =>
+            setTimeout(resolve, delayBetweenBatches),
+          );
+        }
       }
 
       notification.status = "completed";
       notification.completedAt = new Date();
       await notification.save();
 
-      return { total: users.length, successful, failed };
+      console.log(
+        `✅ Broadcast yakunlandi: ${successful} muvaffaqiyatli, ${failed} xato`,
+      );
+
+      return {
+        total: users.length,
+        successful,
+        failed,
+      };
     } catch (error) {
-      console.error("Xabar yuborishda xatolik:", error);
+      console.error("📤 Broadcast jarayonida xatolik:", error);
 
       if (notification) {
         notification.status = "failed";
@@ -1400,13 +1553,6 @@ class BotScenes {
             `🚫 *Bloklanganlar:* ${stats.blockedUsers}\n` +
             `📈 *Bugun qo\'shilgan:* ${stats.todayUsers}\n` +
             `🔥 *Faol foydalanuvchilar:* ${stats.activeUsers}\n` +
-            // `✅ *Obuna bo\'lganlar:* ${stats.subscribedUsers}\n\n` +
-            // `📱 *iPhone ishtirokchilar:* ${stats.iphoneParticipants}\n` +
-            // `📱 *Redmi ishtirokchilar:* ${stats.redmiParticipants}\n` +
-            // `🚗 *Gentra ishtirokchilar:* ${stats.gentraParticipants}\n\n` +
-            // `🏆 *iPhone g\'oliblari:* ${stats.iphoneWinners}/${CONFIG.CONTESTS.IPHONE.prize_count}\n` +
-            // `🏆 *Redmi g\'oliblari:* ${stats.redmiWinners}/${CONFIG.CONTESTS.REDMI.prize_count}\n` +
-            // `🏆 *Gentra g\'oliblari:* ${stats.gentraWinners}/${CONFIG.CONTESTS.GENTRA.prize_count}\n\n` +
             `🕒 *Oxirgi yangilanish:* ${Utils.formatDate(new Date(), "time")}`,
           { parse_mode: "Markdown" },
         );
@@ -1461,41 +1607,298 @@ class BotScenes {
       try {
         if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) return;
 
-        if (!ctx.session.broadcast?.enabled) return;
-
-        // /cancel bo'lsa
+        // /cancel komandasi
         if (ctx.message?.text === "/cancel") {
           ctx.session.broadcast = null;
-          return ctx.reply("❌ Bekor qilindi.");
+          return ctx.reply("❌ Broadcasting bekor qilindi.");
         }
 
-        const filters = ctx.session.broadcast.filters || {};
+        // Broadcast rejimida bo'lsa
+        if (ctx.session.broadcast?.enabled) {
+          const filters = ctx.session.broadcast.filters || {};
 
-        await ctx.reply("🚀 Yuborish boshlandi...");
+          // Foydalanuvchilarning sonini tekshirish
+          let query = {};
+          if (filters.subscribed !== undefined)
+            query.isSubscribed = filters.subscribed;
+          if (filters.participatedIn)
+            query[`contests.${filters.participatedIn}.participated`] = true;
+          if (filters.minParticipationCount)
+            query.participationCount = { $gte: filters.minParticipationCount };
+
+          const userCount = await User.countDocuments(query);
+
+          if (userCount > 500) {
+            await ctx.reply(
+              `⚠️ *DIQQAT!*\n\n` +
+                `Siz ${userCount} ta foydalanuvchiga xabar yubormoqchisiz.\n\n` +
+                `Bu jarayon ${Math.ceil(userCount / CONFIG.SETTINGS.broadcast_batch_size) * (CONFIG.SETTINGS.broadcast_delay / 1000)} sekund davom etadi.\n\n` +
+                `Davom ettirish uchun "✅ Davom ettirish" tugmasini bosing yoki /cancel tugmasini bosing.`,
+              {
+                parse_mode: "Markdown",
+                ...Markup.inlineKeyboard([
+                  [
+                    Markup.button.callback(
+                      "✅ Davom ettirish",
+                      "confirm_broadcast",
+                    ),
+                  ],
+                  [
+                    Markup.button.callback(
+                      "❌ Bekor qilish",
+                      "cancel_broadcast",
+                    ),
+                  ],
+                ]),
+              },
+            );
+
+            // Tasdiqni kutish
+            ctx.session.pendingBroadcast = {
+              message: ctx.message,
+              filters: filters,
+            };
+            ctx.session.broadcast.enabled = false;
+            return;
+          }
+
+          // Agar userlar kam bo'lsa, darrov boshlash
+          await ctx.reply(
+            `🚀 Xabar yuborish boshlanmoqda...\n👥 ${userCount} ta foydalanuvchi`,
+          );
+
+          const result = await DatabaseService.broadcastMessage(
+            ctx.telegram,
+            ctx.message,
+            {
+              ...filters,
+              adminId: ctx.from.id,
+              adminUsername: ctx.from.username,
+            },
+          );
+
+          ctx.session.broadcast = null;
+
+          await ctx.reply(
+            `✅ *Xabar yuborish tugadi!*\n\n` +
+              `📊 *Statistika:*\n` +
+              `👥 Jami foydalanuvchilar: ${result.total}\n` +
+              `✅ Muvaffaqiyatli: ${result.successful}\n` +
+              `❌ Xato: ${result.failed}\n` +
+              `📈 Muvaffaqiyat darajasi: ${((result.successful / result.total) * 100).toFixed(1)}%`,
+            { parse_mode: "Markdown" },
+          );
+        }
+      } catch (error) {
+        console.error("Broadcast message handler error:", error);
+        ctx.session.broadcast = null;
+        await ctx.reply("❌ Xabar yuborishda xatolik yuz berdi.");
+      }
+    });
+
+    // Tasdiq tugmasi
+    scene.action("confirm_broadcast", async (ctx) => {
+      try {
+        await ctx.answerCbQuery();
+        await ctx.deleteMessage();
+
+        const pending = ctx.session.pendingBroadcast;
+        if (!pending) {
+          return ctx.reply("❌ Tasdiqlash ma'lumotlari topilmadi.");
+        }
+
+        await ctx.reply("🚀 Xabar yuborish boshlanmoqda...");
 
         const result = await DatabaseService.broadcastMessage(
           ctx.telegram,
-          ctx.message,
+          pending.message,
           {
-            ...filters,
+            ...pending.filters,
             adminId: ctx.from.id,
             adminUsername: ctx.from.username,
           },
         );
 
+        ctx.session.pendingBroadcast = null;
         ctx.session.broadcast = null;
 
         await ctx.reply(
-          `✅ Tugadi!\n\n👥 Jami: ${result.total}\n✅ Yuborildi: ${result.successful}\n❌ Xato: ${result.failed}`,
+          `✅ *Xabar yuborish tugadi!*\n\n` +
+            `📊 *Statistika:*\n` +
+            `👥 Jami foydalanuvchilar: ${result.total}\n` +
+            `✅ Muvaffaqiyatli: ${result.successful}\n` +
+            `❌ Xato: ${result.failed}\n` +
+            `📈 Muvaffaqiyat darajasi: ${((result.successful / result.total) * 100).toFixed(1)}%`,
+          { parse_mode: "Markdown" },
         );
-      } catch (e) {
-        console.error("broadcast scene message error:", e);
-        ctx.session.broadcast = null;
-        await ctx.reply("❌ Xabar yuborishda xatolik bo'ldi.");
+      } catch (error) {
+        console.error("Confirm broadcast error:", error);
+        await ctx.reply("❌ Xabar yuborishda xatolik yuz berdi.");
       }
     });
 
-    // ... O'xshash admin scene qolgan qismlari
+    // Bekor qilish tugmasi
+    scene.action("cancel_broadcast", async (ctx) => {
+      await ctx.answerCbQuery();
+      await ctx.deleteMessage();
+
+      ctx.session.pendingBroadcast = null;
+      ctx.session.broadcast = null;
+
+      await ctx.reply("❌ Broadcasting bekor qilindi.");
+    });
+
+    // G'oliblarni ko'rish
+    scene.action("admin_winners", async (ctx) => {
+      try {
+        const keyboard = [];
+        for (const contestType of ["iphone", "redmi", "gentra"]) {
+          keyboard.push([
+            Markup.button.callback(
+              `🏆 ${contestType.toUpperCase()} g'oliblari`,
+              `show_winners_${contestType}`,
+            ),
+          ]);
+        }
+        keyboard.push([Markup.button.callback("🔙 Orqaga", "back_to_admin")]);
+
+        await ctx.editMessageText(
+          "🏆 *G'OLIBLAR RO'YXATI*\n\nQaysi konkurs g'oliblarini ko'rmoqchisiz?",
+          {
+            parse_mode: "Markdown",
+            ...Markup.inlineKeyboard(keyboard),
+          },
+        );
+      } catch (error) {
+        console.error("Winners menu error:", error);
+        await ctx.answerCbQuery("❌ Xatolik yuz berdi!");
+      }
+    });
+
+    // Har bir konkurs g'oliblarini ko'rsatish
+    for (const contestType of ["iphone", "redmi", "gentra"]) {
+      scene.action(`show_winners_${contestType}`, async (ctx) => {
+        try {
+          const winners = await DatabaseService.getWinners(contestType);
+          const contestName = CONFIG.CONTESTS[contestType.toUpperCase()].name;
+
+          if (winners.length === 0) {
+            await ctx.editMessageText(
+              `ℹ️ *${contestName} konkursida hali g'olib aniqlanmagan.*`,
+              { parse_mode: "Markdown" },
+            );
+            return;
+          }
+
+          let message = `🏆 *${contestName} G'OLIBLARI*\n\n`;
+          winners.forEach((winner, index) => {
+            message += `${index + 1}. ${winner.userInfo.firstName || ""} ${
+              winner.userInfo.lastName || ""
+            } (@${winner.userInfo.username || "username yo'q"}) - ID: ${
+              winner.participantId
+            }\n`;
+            message += `   📅 ${Utils.formatDate(
+              winner.selectedAt,
+              "date",
+            )}\n\n`;
+          });
+
+          await ctx.editMessageText(message, {
+            parse_mode: "Markdown",
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback("🔙 Orqaga", "admin_winners")],
+            ]),
+          });
+        } catch (error) {
+          console.error(`Show ${contestType} winners error:`, error);
+          await ctx.answerCbQuery("❌ G'oliblarni olishda xatolik!");
+        }
+      });
+    }
+
+    // Tasodifiy g'olib tanlash
+    scene.action("admin_random_winner", async (ctx) => {
+      try {
+        await ctx.editMessageText(
+          "🎯 *TASODIFIY G'OLIB TANLASH*\n\nQaysi konkurs uchun g'olib tanlamoqchisiz?",
+          {
+            parse_mode: "Markdown",
+            ...Markup.inlineKeyboard([
+              [
+                Markup.button.callback(
+                  "📱 iPhone uchun",
+                  "random_winner_iphone",
+                ),
+              ],
+              [
+                Markup.button.callback(
+                  "📱 Redmi uchun",
+                  "random_winner_redmi",
+                ),
+              ],
+              [
+                Markup.button.callback(
+                  "🚗 Gentra uchun",
+                  "random_winner_gentra",
+                ),
+              ],
+              [Markup.button.callback("🔙 Orqaga", "back_to_admin")],
+            ]),
+          },
+        );
+      } catch (error) {
+        console.error("Random winner menu error:", error);
+        await ctx.answerCbQuery("❌ Xatolik yuz berdi!");
+      }
+    });
+
+    // Har bir konkurs uchun tasodifiy g'olib
+    for (const contestType of ["iphone", "redmi", "gentra"]) {
+      scene.action(`random_winner_${contestType}`, async (ctx) => {
+        try {
+          await ctx.answerCbQuery("⏳ G'olib tanlanmoqda...");
+
+          const winner = await DatabaseService.selectWinner(
+            contestType,
+            ctx.from.id,
+            ctx.from.username,
+          );
+
+          await ctx.editMessageText(
+            `🎉 *YANGI G'OLIB ANIQLANDI!*\n\n` +
+              `🏆 *Konkurs:* ${CONFIG.CONTESTS[contestType.toUpperCase()].name}\n` +
+              `👤 *G'olib:* ${winner.userInfo.firstName || ""} ${
+                winner.userInfo.lastName || ""
+              }\n` +
+              `📱 *Username:* @${winner.userInfo.username || "username yo'q"}\n` +
+              `🔢 *ID:* ${winner.participantId}\n` +
+              `🏅 *Sovg'a raqami:* ${winner.prizeNumber}\n` +
+              `🔐 *Tasdiqlash kodi:* ${winner.verificationCode}\n\n` +
+              `✅ G'olib muvaffaqiyatli tanlandi va bazaga saqlandi.`,
+            {
+              parse_mode: "Markdown",
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback("🔙 Orqaga", "admin_random_winner")],
+              ]),
+            },
+          );
+        } catch (error) {
+          console.error(`Random winner ${contestType} error:`, error);
+          await ctx.answerCbQuery(`❌ ${error.message}`);
+        }
+      });
+    }
+
+    // Orqaga tugmasi
+    scene.action("back_to_admin", async (ctx) => {
+      await ctx.scene.reenter();
+    });
+
+    // Chiqish tugmasi
+    scene.action("exit_admin", async (ctx) => {
+      await ctx.editMessageText("👋 Admin panelidan chiqildi.");
+      ctx.scene.leave();
+    });
 
     return scene;
   }
@@ -1527,7 +1930,7 @@ class BotScenes {
         if (channel.requires_admin) {
           return [
             Markup.button.url(
-              `👑 ${channel.name} (ADMIN bo\'lish)`,
+              `👑 ${channel.name} (ADMIN bo'lish)`,
               channel.url,
             ),
           ];
@@ -1542,8 +1945,8 @@ class BotScenes {
       const message = channels.some((c) => c.requires_admin)
         ? "*DIQQAT!*\n\n" +
           "Ba'zi kanallar uchun ADMIN bo'lish talab qilinadi:\n\n" +
-          "1. Senator 18+\n" +
-          "2. Senator 19+\n\n" +
+          "1. На Чиле +18\n" +
+          "2. Senator 18+\n\n" +
           "Ushbu kanallarga obuna bo'lish uchun admin bo'lishingiz kerak!"
         : "Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'ling:";
 
@@ -1599,6 +2002,7 @@ class SenatorBot {
           console.error("Bot error:", error);
           Utils.logToFile("error", "Bot middleware error", {
             error: error.message,
+            stack: error.stack,
           });
 
           try {
@@ -2066,9 +2470,9 @@ class SenatorBot {
                 `❌ *JOIN REQUEST RAD ETILDI!*\n\n` +
                   `Siz "${channel.name}" kanaliga qabul qilinmadingiz!\n\n` +
                   `*Sabab:* Siz quyidagi kanallarda ADMIN emassiz:\n` +
-                  `• Senator 18+\n` +
-                  `• Senator 19+\n\n` +
-                  `Iltimos, avval ushbu kanallarga ADMIN bo\'ling, keyin qayta urinib ko\'ring!`,
+                  `• На Чиле +18\n` +
+                  `• Senator 18+\n\n` +
+                  `Iltimos, avval ushbu kanallarga ADMIN bo'ling, keyin qayta urinib ko'ring!`,
                 { parse_mode: "Markdown" },
               );
             } catch (error) {
@@ -2110,7 +2514,7 @@ class SenatorBot {
       console.log(`👑 Adminlar: ${CONFIG.ADMIN_IDS.join(", ")}`);
       console.log(`📊 Kanallar: ${CONFIG.REQUIRED_CHANNELS.length} ta`);
       console.log(
-        `📱 Sovg\'alar: ${CONFIG.CONTESTS.IPHONE.prize_count} iPhone, ${CONFIG.CONTESTS.REDMI.prize_count} Redmi, ${CONFIG.CONTESTS.GENTRA.prize_count} Gentra`,
+        `📱 Sovg'alar: ${CONFIG.CONTESTS.IPHONE.prize_count} iPhone, ${CONFIG.CONTESTS.REDMI.prize_count} Redmi, ${CONFIG.CONTESTS.GENTRA.prize_count} Gentra`,
       );
       console.log("🚀 Bot faol va ishlamoqda...");
 
