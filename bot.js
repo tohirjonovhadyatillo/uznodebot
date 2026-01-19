@@ -1516,18 +1516,18 @@ class BotScenes {
             ...Markup.inlineKeyboard([
               [Markup.button.callback("📊 Statistika", "admin_stats")],
               [Markup.button.callback("📣 Xabar yuborish", "admin_broadcast")],
-              [
-                Markup.button.callback(
-                  "🏆 G'oliblarni ko'rish",
-                  "admin_winners",
-                ),
-              ],
-              [
-                Markup.button.callback(
-                  "🎯 Tasodifiy g'olib",
-                  "admin_random_winner",
-                ),
-              ],
+            //   [
+            //     Markup.button.callback(
+            //       "🏆 G'oliblarni ko'rish",
+            //       "admin_winners",
+            //     ),
+            //   ],
+            //   [
+            //     Markup.button.callback(
+            //       "🎯 Tasodifiy g'olib",
+            //       "admin_random_winner",
+            //     ),
+            //   ],
               [Markup.button.callback("🚪 Chiqish", "exit_admin")],
             ]),
           },
