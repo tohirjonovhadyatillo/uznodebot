@@ -60,6 +60,13 @@ const CONFIG = {
       type: "public",
       username: "@DangerEsports_market",
     },
+        {
+      id: "@SENATOR_yohohobet",
+      name: "SENATOR PUBGM",
+      url: "https://t.me/senator_yohohobet",
+      type: "public",
+      username: "@SENATOR_yohohobet",
+    },
     {
       id: "@senatorkuponchik",
       name: "Senator Kuponchik",
@@ -94,13 +101,6 @@ const CONFIG = {
       url: "https://t.me/SENATOR_EFIR",
       type: "public",
       username: "@senator_efir",
-    },
-        {
-      id: "@senatorfutbol",
-      name: "SENATOR FUTBOL",
-      url: "https://t.me/SENATORFUTBOL",
-      type: "public",
-      username: "@senatorfutbol",
     },
   ],
 
