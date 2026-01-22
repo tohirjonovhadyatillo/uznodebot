@@ -89,16 +89,9 @@ const CONFIG = {
       username: "@senatorlive",
     },
         {
-      id: "@senatorfutbol",
-      name: "SENATOR FUTBOL",
-      url: "https://t.me/SENATORFUTBOL",
-      type: "public",
-      username: "@senatorFUTBOL",
-    },
-            {
       id: "@senator_efir",
       name: "SENATOR EFIR",
-      url: "https://t.me/SENATOR_efir",
+      url: "https://t.me/SENATOR_EFIR",
       type: "public",
       username: "@senator_efir",
     },
