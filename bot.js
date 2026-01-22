@@ -88,6 +88,13 @@ const CONFIG = {
       type: "public",
       username: "@senatorlive",
     },
+        {
+      id: "@senatorfutbol",
+      name: "SENATOR FUTBOL",
+      url: "https://t.me/SENATORFUTBOL",
+      type: "public",
+      username: "@senatorFUTBOL",
+    },
   ],
 
   // Contest Configuration
