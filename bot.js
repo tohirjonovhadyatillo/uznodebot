@@ -53,7 +53,7 @@ const CONFIG = {
       type: "public",
       username: "@DangerEsportsFamily",
     },
-        {
+    {
       id: "@DangerEsports_market",
       name: "Danger Esports",
       url: "https://t.me/DangerEsports_Market",
@@ -88,12 +88,19 @@ const CONFIG = {
       type: "public",
       username: "@senatorlive",
     },
-        {
+    {
       id: "@senator_efir",
       name: "SENATOR EFIR",
       url: "https://t.me/SENATOR_EFIR",
       type: "public",
       username: "@senator_efir",
+    },
+        {
+      id: "@senatorfutbol",
+      name: "SENATOR FUTBOL",
+      url: "https://t.me/SENATORFUTBOL",
+      type: "public",
+      username: "@senatorfutbol",
     },
   ],
 
@@ -411,11 +418,14 @@ class Utils {
       return await ctx.editMessageText(text, extra);
     } catch (error) {
       // Agar "message is not modified" xatosi bo'lsa, ignore qilamiz
-      if (error.description && error.description.includes("message is not modified")) {
+      if (
+        error.description &&
+        error.description.includes("message is not modified")
+      ) {
         console.log("ℹ️ Message is not modified - ignoring error");
         return null; // Xatoni ignore qilamiz
       }
-      
+
       // Boshqa xatolarni throw qilamiz
       throw error;
     }
@@ -427,24 +437,25 @@ class Utils {
       // ChatId va userId ni to'g'ri formatlash
       const chatIdStr = String(chatId);
       const userIdNum = parseInt(userId);
-      
+
       if (isNaN(userIdNum) || userIdNum <= 0) {
         console.error(`❌ Invalid user_id: ${userId}`);
         return false;
       }
-      
+
       return await bot.telegram.approveChatJoinRequest(chatIdStr, userIdNum);
     } catch (error) {
       // Agar "invalid user_id" yoki "CHAT_ID_INVALID" bo'lsa, ignore qilamiz
-      if (error.description && (
-        error.description.includes("invalid user_id") ||
-        error.description.includes("CHAT_ID_INVALID") ||
-        error.description.includes("USER_ID_INVALID")
-      )) {
+      if (
+        error.description &&
+        (error.description.includes("invalid user_id") ||
+          error.description.includes("CHAT_ID_INVALID") ||
+          error.description.includes("USER_ID_INVALID"))
+      ) {
         console.log(`⚠️ Join request error (ignored): ${error.description}`);
         return false;
       }
-      
+
       // Boshqa xatolarni log qilamiz
       console.error(`❌ Chat join request error:`, error.message);
       throw error;
@@ -457,24 +468,27 @@ class Utils {
       // ChatId va userId ni to'g'ri formatlash
       const chatIdStr = String(chatId);
       const userIdNum = parseInt(userId);
-      
+
       if (isNaN(userIdNum) || userIdNum <= 0) {
         console.error(`❌ Invalid user_id: ${userId}`);
         return false;
       }
-      
+
       return await bot.telegram.declineChatJoinRequest(chatIdStr, userIdNum);
     } catch (error) {
       // Agar "invalid user_id" yoki "CHAT_ID_INVALID" bo'lsa, ignore qilamiz
-      if (error.description && (
-        error.description.includes("invalid user_id") ||
-        error.description.includes("CHAT_ID_INVALID") ||
-        error.description.includes("USER_ID_INVALID")
-      )) {
-        console.log(`⚠️ Decline join request error (ignored): ${error.description}`);
+      if (
+        error.description &&
+        (error.description.includes("invalid user_id") ||
+          error.description.includes("CHAT_ID_INVALID") ||
+          error.description.includes("USER_ID_INVALID"))
+      ) {
+        console.log(
+          `⚠️ Decline join request error (ignored): ${error.description}`,
+        );
         return false;
       }
-      
+
       // Boshqa xatolarni log qilamiz
       console.error(`❌ Decline chat join request error:`, error.message);
       throw error;
@@ -514,7 +528,9 @@ class Utils {
 
     // 150 bilan boshlanishini tekshirish
     if (!/^\d+$/.test(id) || Number(id) < 150) {
-      throw new Error("❌ ID raqam noto'ri yoki eskirgan! ID 150 bilan boshlanishi kerak.");
+      throw new Error(
+        "❌ ID raqam noto'ri yoki eskirgan! ID 150 bilan boshlanishi kerak.",
+      );
     }
 
     // Pattern tekshirish
@@ -533,13 +549,17 @@ class Utils {
       } catch (error) {
         // Agar 400 xato bo'lsa (message is not modified, invalid user_id), retry qilmaymiz
         if (error.response && error.response.error_code === 400) {
-          console.log(`⚠️ 400 error detected, skipping retry: ${error.description}`);
+          console.log(
+            `⚠️ 400 error detected, skipping retry: ${error.description}`,
+          );
           throw error;
         }
-        
+
         if (i === maxRetries - 1) throw error;
-        
-        console.log(`🔄 Retry ${i + 1}/${maxRetries} after error: ${error.message}`);
+
+        console.log(
+          `🔄 Retry ${i + 1}/${maxRetries} after error: ${error.message}`,
+        );
         await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
       }
     }
@@ -1136,32 +1156,28 @@ class DatabaseService {
 
       for (let i = 0; i < users.length; i += batchSize) {
         const batch = users.slice(i, i + batchSize);
-        console.log(`📦 Batch ${Math.floor(i / batchSize) + 1}: ${batch.length} ta user`);
+        console.log(
+          `📦 Batch ${Math.floor(i / batchSize) + 1}: ${batch.length} ta user`,
+        );
 
         const batchPromises = batch.map(async (user) => {
           try {
             // Telegram ID ni to'g'ri formatlash
             const chatId = String(user.userId);
-            
+
             // Xabarni nusxalash
             if (adminMessage.poll) {
               // Poll yuborish
               const poll = adminMessage.poll;
-              await bot.telegram.sendPoll(
-                chatId,
-                poll.question,
-                poll.options,
-                {
-                  is_anonymous: poll.is_anonymous || false,
-                  type: poll.type || "regular",
-                  allows_multiple_answers:
-                    poll.allows_multiple_answers || false,
-                  correct_option_id: poll.correct_option_id,
-                  explanation: poll.explanation,
-                  open_period: poll.open_period,
-                  close_date: poll.close_date,
-                },
-              );
+              await bot.telegram.sendPoll(chatId, poll.question, poll.options, {
+                is_anonymous: poll.is_anonymous || false,
+                type: poll.type || "regular",
+                allows_multiple_answers: poll.allows_multiple_answers || false,
+                correct_option_id: poll.correct_option_id,
+                explanation: poll.explanation,
+                open_period: poll.open_period,
+                close_date: poll.close_date,
+              });
             } else if (adminMessage.photo) {
               // Rasm yuborish
               await bot.telegram.sendPhoto(
@@ -1175,15 +1191,11 @@ class DatabaseService {
               );
             } else if (adminMessage.video) {
               // Video yuborish
-              await bot.telegram.sendVideo(
-                chatId,
-                adminMessage.video.file_id,
-                {
-                  caption: adminMessage.caption,
-                  parse_mode: adminMessage.parse_mode,
-                  caption_entities: adminMessage.caption_entities,
-                },
-              );
+              await bot.telegram.sendVideo(chatId, adminMessage.video.file_id, {
+                caption: adminMessage.caption,
+                parse_mode: adminMessage.parse_mode,
+                caption_entities: adminMessage.caption_entities,
+              });
             } else if (adminMessage.document) {
               // Hujjat yuborish
               await bot.telegram.sendDocument(
@@ -1197,26 +1209,18 @@ class DatabaseService {
               );
             } else if (adminMessage.audio) {
               // Audio yuborish
-              await bot.telegram.sendAudio(
-                chatId,
-                adminMessage.audio.file_id,
-                {
-                  caption: adminMessage.caption,
-                  parse_mode: adminMessage.parse_mode,
-                  caption_entities: adminMessage.caption_entities,
-                },
-              );
+              await bot.telegram.sendAudio(chatId, adminMessage.audio.file_id, {
+                caption: adminMessage.caption,
+                parse_mode: adminMessage.parse_mode,
+                caption_entities: adminMessage.caption_entities,
+              });
             } else if (adminMessage.voice) {
               // Ovozli xabar yuborish
-              await bot.telegram.sendVoice(
-                chatId,
-                adminMessage.voice.file_id,
-                {
-                  caption: adminMessage.caption,
-                  parse_mode: adminMessage.parse_mode,
-                  caption_entities: adminMessage.caption_entities,
-                },
-              );
+              await bot.telegram.sendVoice(chatId, adminMessage.voice.file_id, {
+                caption: adminMessage.caption,
+                parse_mode: adminMessage.parse_mode,
+                caption_entities: adminMessage.caption_entities,
+              });
             } else if (adminMessage.sticker) {
               // Sticker yuborish
               await bot.telegram.sendSticker(
@@ -1234,10 +1238,9 @@ class DatabaseService {
 
             successful++;
             console.log(`✅ ${chatId}: Xabar yuborildi`);
-            
+
             // Har bir muvaffaqiyatli yuborishdan keyin kichik kutish
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
+            await new Promise((resolve) => setTimeout(resolve, 100));
           } catch (error) {
             failed++;
 
@@ -1271,29 +1274,38 @@ class DatabaseService {
               error.response?.error_code === 429
             ) {
               console.log(`⚠️ ${user.userId}: Rate limit (429)`);
-              
+
               // Agar rate limit bo'lsa, kutilayotgan vaqtni olish
               const retryAfter = error.response?.parameters?.retry_after || 2;
               console.log(`⏳ ${retryAfter} soniya kutmoqda...`);
-              await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-              
+              await new Promise((resolve) =>
+                setTimeout(resolve, retryAfter * 1000),
+              );
+
               // Qayta urinish
               try {
-                await bot.telegram.sendMessage(String(user.userId), adminMessage.text, {
-                  parse_mode: adminMessage.parse_mode,
-                  entities: adminMessage.entities,
-                  disable_web_page_preview: adminMessage.disable_web_page_preview,
-                });
+                await bot.telegram.sendMessage(
+                  String(user.userId),
+                  adminMessage.text,
+                  {
+                    parse_mode: adminMessage.parse_mode,
+                    entities: adminMessage.entities,
+                    disable_web_page_preview:
+                      adminMessage.disable_web_page_preview,
+                  },
+                );
                 successful++;
                 failed--;
                 console.log(`✅ ${user.userId}: Qayta urinish muvaffaqiyatli`);
               } catch (retryError) {
-                console.log(`❌ ${user.userId}: Qayta urinish ham muvaffaqiyatsiz`);
+                console.log(
+                  `❌ ${user.userId}: Qayta urinish ham muvaffaqiyatsiz`,
+                );
               }
             } else {
               console.log(`❌ ${user.userId}: ${errorMessage}`);
             }
-            
+
             // Log faylga yozish
             await Utils.logToFile("error", `Broadcast xatosi: ${user.userId}`, {
               error: errorMessage,
@@ -1832,7 +1844,8 @@ class BotScenes {
         Markup.button.callback("✅ Obunani tekshirish", "check_subscription"),
       ]);
 
-      const message = "Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'ling:";
+      const message =
+        "Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'ling:";
 
       await ctx.reply(Utils.escapeMarkdown(message), {
         parse_mode: "MarkdownV2",
@@ -1853,32 +1866,32 @@ class SenatorBot {
     this.scenes = [];
     this.stage = null;
     this.initialized = false;
-    
+
     // Global error handlers
     this.setupGlobalErrorHandlers();
   }
 
   setupGlobalErrorHandlers() {
     // Unhandled promise rejections
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('⚠️ Unhandled Rejection at:', promise, 'reason:', reason);
-      Utils.logToFile('error', 'Unhandled Rejection', {
+    process.on("unhandledRejection", (reason, promise) => {
+      console.error("⚠️ Unhandled Rejection at:", promise, "reason:", reason);
+      Utils.logToFile("error", "Unhandled Rejection", {
         reason: reason?.message || reason,
-        stack: reason?.stack
+        stack: reason?.stack,
       });
     });
 
     // Uncaught exceptions
-    process.on('uncaughtException', (error) => {
-      console.error('⚠️ Uncaught Exception:', error);
-      Utils.logToFile('error', 'Uncaught Exception', {
+    process.on("uncaughtException", (error) => {
+      console.error("⚠️ Uncaught Exception:", error);
+      Utils.logToFile("error", "Uncaught Exception", {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       // Botni o'chirmaymiz, faqat log qilamiz
     });
 
-    console.log('✅ Global error handlers initialized');
+    console.log("✅ Global error handlers initialized");
   }
 
   async initialize() {
@@ -2217,11 +2230,13 @@ class SenatorBot {
         const chatId = request.chat.id;
         const user = request.from;
 
-        console.log(`🔔 Join request from ${userId} (@${user.username || 'no-username'}) to chat ${chatId}`);
+        console.log(
+          `🔔 Join request from ${userId} (@${user.username || "no-username"}) to chat ${chatId}`,
+        );
 
         // Check if this is one of our public channels
         const channel = CONFIG.REQUIRED_CHANNELS.find(
-          (c) => c.id === chatId.toString()
+          (c) => c.id === chatId.toString(),
         );
 
         if (!channel) {
@@ -2234,7 +2249,9 @@ class SenatorBot {
         // Public kanallar uchun avtomatik qabul qilamiz
         try {
           await Utils.safeApproveChatJoinRequest(this.bot, chatId, userId);
-          console.log(`✅ Approved join request for ${userId} to ${channel.name}`);
+          console.log(
+            `✅ Approved join request for ${userId} to ${channel.name}`,
+          );
 
           // Send welcome message
           try {
@@ -2243,7 +2260,7 @@ class SenatorBot {
               `✅ *QABUL QILINDI!*\n\n` +
                 `Siz "${channel.name}" kanaliga qabul qilindingiz!\n\n` +
                 `Endi boshqa kanallarga ham obuna bo'lishingizni tekshirib ko'ring.`,
-              { parse_mode: "Markdown" }
+              { parse_mode: "Markdown" },
             );
           } catch (error) {
             console.error("Qabul xabarini yuborishda xatolik:", error.message);
@@ -2255,17 +2272,15 @@ class SenatorBot {
           } catch (error) {
             console.error("User subscription update error:", error.message);
           }
-
         } catch (error) {
           console.error(`❌ Join request processing error:`, error.message);
           // Xato allaqachon safeApproveChatJoinRequest ichida log qilingan
         }
-
       } catch (error) {
         console.error("❌ Join request handler error:", error);
-        Utils.logToFile('error', 'Join request handler error', {
+        Utils.logToFile("error", "Join request handler error", {
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       }
     });
@@ -2453,37 +2468,42 @@ async function main() {
 
     // Handle graceful shutdown
     process.once("SIGINT", () => {
-      console.log('🛑 SIGINT received, shutting down...');
-      bot.stop().then(() => {
-        console.log('👋 Bot stopped gracefully');
-        process.exit(0);
-      }).catch(error => {
-        console.error('❌ Error during shutdown:', error);
-        process.exit(1);
-      });
+      console.log("🛑 SIGINT received, shutting down...");
+      bot
+        .stop()
+        .then(() => {
+          console.log("👋 Bot stopped gracefully");
+          process.exit(0);
+        })
+        .catch((error) => {
+          console.error("❌ Error during shutdown:", error);
+          process.exit(1);
+        });
     });
-    
+
     process.once("SIGTERM", () => {
-      console.log('🛑 SIGTERM received, shutting down...');
-      bot.stop().then(() => {
-        console.log('👋 Bot stopped gracefully');
-        process.exit(0);
-      }).catch(error => {
-        console.error('❌ Error during shutdown:', error);
-        process.exit(1);
-      });
+      console.log("🛑 SIGTERM received, shutting down...");
+      bot
+        .stop()
+        .then(() => {
+          console.log("👋 Bot stopped gracefully");
+          process.exit(0);
+        })
+        .catch((error) => {
+          console.error("❌ Error during shutdown:", error);
+          process.exit(1);
+        });
     });
 
     // Start the bot
     await bot.start();
-    
-    console.log('🚀 Bot started successfully with enhanced error handling');
-    
+
+    console.log("🚀 Bot started successfully with enhanced error handling");
   } catch (error) {
     console.error("❌ Botni ishga tushirishda og'ir xatolik:", error);
-    Utils.logToFile('error', 'Bot startup error', {
+    Utils.logToFile("error", "Bot startup error", {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     process.exit(1);
   }
