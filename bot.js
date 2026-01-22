@@ -81,6 +81,12 @@ const CONFIG = {
       type: "public",
       username: "@senatorazart",
     },
+        {
+      id: "-1002857759804",
+      name: "SENATOR 19+",
+      url: "https://t.me/+PDg9v97r6VsxNWNi",
+      type: "public",
+    },
 
   ],
 
