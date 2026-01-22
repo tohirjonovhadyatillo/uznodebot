@@ -53,6 +53,13 @@ const CONFIG = {
       type: "public",
       username: "@DangerEsportsFamily",
     },
+        {
+      id: "@DangerEsports_market",
+      name: "Danger Esports",
+      url: "https://t.me/DangerEsports_Market",
+      type: "public",
+      username: "@DangerEsports_market",
+    },
     {
       id: "@senatorkuponchik",
       name: "Senator Kuponchik",
