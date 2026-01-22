@@ -81,13 +81,13 @@ const CONFIG = {
       type: "public",
       username: "@senatorazart",
     },
-        {
-      id: "-1002857759804",
-      name: "SENATOR 19+",
-      url: "https://t.me/+PDg9v97r6VsxNWNi",
+    {
+      id: "@senatorlive",
+      name: "SENATOR LIVE",
+      url: "https://t.me/SENATORLIVE",
       type: "public",
+      username: "@senatorlive",
     },
-
   ],
 
   // Contest Configuration
