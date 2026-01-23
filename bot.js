@@ -1,27 +1,20 @@
 "use strict";
 
-// ============================
-// 1. IMPORTS AND CONFIGURATION
-// ============================
+/* ============================
+   1) IMPORTS & CONFIG
+============================ */
 const { Telegraf, Markup, Scenes, session } = require("telegraf");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const fs = require("fs").promises;
 const path = require("path");
 
-// Environment variables
 require("dotenv").config();
 
-// Configuration
 const CONFIG = {
-  // Bot Configuration
-  BOT_TOKEN:
-    process.env.BOT_TOKEN || "8257725385:AAFCnlBveQjk8OplTtQe3kLwjlKlLXxXzlQ",
+  BOT_TOKEN: process.env.BOT_TOKEN,
 
-  // MongoDB Configuration
-  MONGODB_URI:
-    process.env.MONGODB_URI ||
-    "mongodb+srv://tohirjonovhadyatillo_db_user:wnSyG3Ud5EomghS1@cluster0.dpjguhn.mongodb.net/senator_bot?retryWrites=true&w=majority",
+  MONGODB_URI: process.env.MONGODB_URI,
   MONGODB_OPTIONS: {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -32,12 +25,11 @@ const CONFIG = {
     minPoolSize: 1,
   },
 
-  // Admin Configuration
   ADMIN_IDS: process.env.ADMIN_IDS
-    ? process.env.ADMIN_IDS.split(",").map((id) => parseInt(id.trim()))
-    : [6873603981, 296801391],
+    ? process.env.ADMIN_IDS.split(",").map((id) => parseInt(id.trim(), 10))
+    : [],
 
-  // YANGILANGAN: Majburiy obuna kanallari (faqat public kanallar)
+  // Majburiy obuna kanallari (public username)
   REQUIRED_CHANNELS: [
     {
       id: "@SENATOR_PUBGM",
@@ -55,14 +47,14 @@ const CONFIG = {
     },
     {
       id: "@DangerEsports_market",
-      name: "Danger Esports",
+      name: "Danger Esports Market",
       url: "https://t.me/DangerEsports_Market",
       type: "public",
       username: "@DangerEsports_market",
     },
-        {
+    {
       id: "@SENATOR_yohohobet",
-      name: "SENATOR PUBGM",
+      name: "SENATOR YOHOHOBET",
       url: "https://t.me/senator_yohohobet",
       type: "public",
       username: "@SENATOR_yohohobet",
@@ -104,7 +96,6 @@ const CONFIG = {
     },
   ],
 
-  // Contest Configuration
   CONTESTS: {
     IPHONE: {
       name: "iPhone 17 Pro Max",
@@ -112,15 +103,8 @@ const CONFIG = {
       site_url:
         "https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration",
       promo_code: "SENATOR",
-      id_pattern: /^153\d{3,12}$/,
-      id_min_length: 6,
-      id_max_length: 15,
       description: "5 ta iPhone 17 Pro Max telefon sovg'a qilinadi!",
-      rules: [
-        "Saytga ro'yxatdan o'ting",
-        "Promokod: SENATOR",
-        "ID raqamingizni oling",
-      ],
+      rules: ["Saytga ro'yxatdan o'ting", "Promokod: SENATOR", "ID raqamingizni oling"],
       button_text: "📱 iPhone 17 Pro Max",
       emoji: "📱",
     },
@@ -129,15 +113,8 @@ const CONFIG = {
       prize_count: 10,
       site_url: "https://xparisport.com/?promocode=senator",
       promo_code: "SENATOR",
-      id_pattern: /^150\d{3,12}$/,
-      id_min_length: 6,
-      id_max_length: 15,
       description: "10 ta Redmi telefon sovg'a qilinadi!",
-      rules: [
-        "Saytga ro'yxatdan o'ting",
-        "Promokod: SENATOR",
-        "ID raqamingizni oling",
-      ],
+      rules: ["Saytga ro'yxatdan o'ting", "Promokod: SENATOR", "ID raqamingizni oling"],
       button_text: "📱 Redmi",
       emoji: "📱",
     },
@@ -147,9 +124,6 @@ const CONFIG = {
       site_url:
         "https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration",
       promo_code: "SENATOR",
-      id_pattern: /^153\d{3,12}$/, // YANGILANDI: Gentra ham 150 bilan boshlanishi kerak
-      id_min_length: 6,
-      id_max_length: 15,
       description: "1 ta Chevrolet Gentra avtomobil sovg'a qilinadi!",
       rules: [
         "Saytga ro'yxatdan o'ting",
@@ -162,21 +136,18 @@ const CONFIG = {
     },
   },
 
-  // Bot Behavior Configuration
   SETTINGS: {
-    subscription_check_interval: 300000, // 5 daqiqa
+    subscription_check_interval: 300000,
     max_retries: 3,
     request_timeout: 10000,
-    cache_duration: 300000, // 5 minutes
-    max_users_per_day: 1000,
-    max_requests_per_minute: 20,
+    cache_duration: 300000,
     maintenance_mode: false,
     debug_mode: process.env.NODE_ENV === "development",
+
     broadcast_batch_size: 15,
     broadcast_delay: 1500,
   },
 
-  // File Paths
   PATHS: {
     logs: "./logs",
     backups: "./backups",
@@ -184,9 +155,14 @@ const CONFIG = {
   },
 };
 
-// ============================
-// 2. DATABASE MODELS
-// ============================
+if (!CONFIG.BOT_TOKEN || !CONFIG.MONGODB_URI) {
+  console.error("❌ .env da BOT_TOKEN va MONGODB_URI bo‘lishi shart!");
+  process.exit(1);
+}
+
+/* ============================
+   2) DATABASE MODELS
+============================ */
 const userSchema = new mongoose.Schema(
   {
     userId: { type: Number, required: true, unique: true, index: true },
@@ -239,43 +215,19 @@ const userSchema = new mongoose.Schema(
     isBlocked: { type: Boolean, default: false },
     blockReason: String,
     isActive: { type: Boolean, default: true, index: true },
-
-    createdAt: { type: Date, default: Date.now, index: true },
-    updatedAt: { type: Date, default: Date.now },
   },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  },
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 userSchema.virtual("fullName").get(function () {
   return `${this.firstName || ""} ${this.lastName || ""}`.trim();
 });
 
-userSchema.virtual("hasParticipatedIphone").get(function () {
-  return this.contests?.iphone?.participated || false;
-});
-
-userSchema.virtual("hasParticipatedRedmi").get(function () {
-  return this.contests?.redmi?.participated || false;
-});
-
-userSchema.virtual("hasParticipatedGentra").get(function () {
-  return this.contests?.gentra?.participated || false;
-});
-
 const User = mongoose.model("User", userSchema);
 
 const winnerSchema = new mongoose.Schema(
   {
-    contestType: {
-      type: String,
-      enum: ["iphone", "redmi", "gentra"],
-      required: true,
-      index: true,
-    },
+    contestType: { type: String, enum: ["iphone", "redmi", "gentra"], required: true, index: true },
     userId: { type: Number, required: true, index: true },
     userInfo: {
       telegramId: Number,
@@ -283,19 +235,10 @@ const winnerSchema = new mongoose.Schema(
       firstName: String,
       lastName: String,
     },
-
     participantId: { type: String, required: true },
     prizeNumber: { type: Number, required: true },
-
-    selectedBy: {
-      adminId: Number,
-      adminUsername: String,
-    },
-    selectionMethod: {
-      type: String,
-      enum: ["random", "manual", "system"],
-      default: "random",
-    },
+    selectedBy: { adminId: Number, adminUsername: String },
+    selectionMethod: { type: String, enum: ["random", "manual", "system"], default: "random" },
 
     notified: { type: Boolean, default: false },
     notificationDate: Date,
@@ -308,29 +251,16 @@ const winnerSchema = new mongoose.Schema(
     verified: { type: Boolean, default: false },
 
     selectionNotes: String,
-
     selectedAt: { type: Date, default: Date.now, index: true },
-    updatedAt: { type: Date, default: Date.now },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true }
 );
 
 const Winner = mongoose.model("Winner", winnerSchema);
 
 const logSchema = new mongoose.Schema({
-  level: {
-    type: String,
-    enum: ["error", "warn", "info", "debug"],
-    required: true,
-    index: true,
-  },
-  source: {
-    type: String,
-    enum: ["bot", "admin", "system", "database", "api"],
-    required: true,
-  },
+  level: { type: String, enum: ["error", "warn", "info", "debug"], required: true, index: true },
+  source: { type: String, enum: ["bot", "admin", "system", "database", "api"], required: true },
   action: { type: String, required: true, index: true },
 
   userId: Number,
@@ -368,20 +298,16 @@ const notificationSchema = new mongoose.Schema({
   sentAt: Date,
   completedAt: Date,
 
-  status: {
-    type: String,
-    enum: ["pending", "sending", "completed", "failed"],
-    default: "pending",
-  },
+  status: { type: String, enum: ["pending", "sending", "completed", "failed"], default: "pending" },
 
   createdAt: { type: Date, default: Date.now, index: true },
 });
 
 const Notification = mongoose.model("Notification", notificationSchema);
 
-// ============================
-// 3. UTILITY FUNCTIONS - YANGILANGAN (SAFE FUNCTIONS QO'SHILDI)
-// ============================
+/* ============================
+   3) UTILS
+============================ */
 class Utils {
   static generateId() {
     return crypto.randomBytes(16).toString("hex");
@@ -390,177 +316,79 @@ class Utils {
   static formatDate(date, format = "full") {
     const d = new Date(date);
     const options = {
-      full: {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      },
-      date: {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      },
-      time: {
-        hour: "2-digit",
-        minute: "2-digit",
-      },
+      full: { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" },
+      date: { year: "numeric", month: "long", day: "numeric" },
+      time: { hour: "2-digit", minute: "2-digit" },
     };
-
     return d.toLocaleDateString("uz-UZ", options[format] || options.full);
   }
 
-  // YANGI: Safe editMessageText funksiyasi
   static async safeEditMessageText(ctx, text, extra = {}) {
     try {
       return await ctx.editMessageText(text, extra);
     } catch (error) {
-      // Agar "message is not modified" xatosi bo'lsa, ignore qilamiz
-      if (
-        error.description &&
-        error.description.includes("message is not modified")
-      ) {
-        console.log("ℹ️ Message is not modified - ignoring error");
-        return null; // Xatoni ignore qilamiz
+      if (error?.description && error.description.includes("message is not modified")) {
+        console.log("ℹ️ Message is not modified - ignored");
+        return null;
       }
-
-      // Boshqa xatolarni throw qilamiz
       throw error;
     }
   }
 
-  // YANGI: Safe approve chat join request funksiyasi
-  static async safeApproveChatJoinRequest(bot, chatId, userId) {
+  static async safeApproveChatJoinRequest(telegrafBot, chatId, userId) {
     try {
-      // ChatId va userId ni to'g'ri formatlash
       const chatIdStr = String(chatId);
-      const userIdNum = parseInt(userId);
-
-      if (isNaN(userIdNum) || userIdNum <= 0) {
-        console.error(`❌ Invalid user_id: ${userId}`);
-        return false;
-      }
-
-      return await bot.telegram.approveChatJoinRequest(chatIdStr, userIdNum);
+      const userIdNum = parseInt(userId, 10);
+      if (isNaN(userIdNum) || userIdNum <= 0) return false;
+      return await telegrafBot.telegram.approveChatJoinRequest(chatIdStr, userIdNum);
     } catch (error) {
-      // Agar "invalid user_id" yoki "CHAT_ID_INVALID" bo'lsa, ignore qilamiz
       if (
-        error.description &&
+        error?.description &&
         (error.description.includes("invalid user_id") ||
           error.description.includes("CHAT_ID_INVALID") ||
           error.description.includes("USER_ID_INVALID"))
       ) {
-        console.log(`⚠️ Join request error (ignored): ${error.description}`);
+        console.log(`⚠️ Join request error ignored: ${error.description}`);
         return false;
       }
-
-      // Boshqa xatolarni log qilamiz
-      console.error(`❌ Chat join request error:`, error.message);
+      console.error("❌ Approve join request error:", error.message);
       throw error;
     }
   }
 
-  // YANGI: Safe decline chat join request funksiyasi
-  static async safeDeclineChatJoinRequest(bot, chatId, userId) {
+  static async safeDeclineChatJoinRequest(telegrafBot, chatId, userId) {
     try {
-      // ChatId va userId ni to'g'ri formatlash
       const chatIdStr = String(chatId);
-      const userIdNum = parseInt(userId);
-
-      if (isNaN(userIdNum) || userIdNum <= 0) {
-        console.error(`❌ Invalid user_id: ${userId}`);
-        return false;
-      }
-
-      return await bot.telegram.declineChatJoinRequest(chatIdStr, userIdNum);
+      const userIdNum = parseInt(userId, 10);
+      if (isNaN(userIdNum) || userIdNum <= 0) return false;
+      return await telegrafBot.telegram.declineChatJoinRequest(chatIdStr, userIdNum);
     } catch (error) {
-      // Agar "invalid user_id" yoki "CHAT_ID_INVALID" bo'lsa, ignore qilamiz
       if (
-        error.description &&
+        error?.description &&
         (error.description.includes("invalid user_id") ||
           error.description.includes("CHAT_ID_INVALID") ||
           error.description.includes("USER_ID_INVALID"))
       ) {
-        console.log(
-          `⚠️ Decline join request error (ignored): ${error.description}`,
-        );
+        console.log(`⚠️ Decline join request error ignored: ${error.description}`);
         return false;
       }
-
-      // Boshqa xatolarni log qilamiz
-      console.error(`❌ Decline chat join request error:`, error.message);
+      console.error("❌ Decline join request error:", error.message);
       throw error;
     }
   }
 
-  // YANGILANGAN: Validatsiya funksiyasi (barcha konkurslar uchun 150 bilan boshlanish)
-  static validateId(id, contestType) {
-    const contest = CONFIG.CONTESTS[contestType.toUpperCase()];
-
-    if (!contest) {
-      throw new Error(`❌ Konkurs konfiguratsiyasi topilmadi: ${contestType}`);
-    }
-
-    // ID ni tozalash
-    id = id.toString().trim().toUpperCase();
-
-    // Bo'sh yoki undefined tekshirish
-    if (!id || id === "") {
-      throw new Error("❌ ID raqam kiritilmadi!");
-    }
-
-    // BARCHA konkurslar uchun bir xil validatsiya (150 bilan boshlanish)
-    if (!/^\d+$/.test(id)) {
-      throw new Error("❌ ID faqat raqamlardan iborat bo'lishi kerak!");
-    }
-
-    // Uzunlik tekshirish
-    if (
-      id.length < contest.id_min_length ||
-      id.length > contest.id_max_length
-    ) {
-      throw new Error(
-        `❌ ID ${contest.id_min_length} dan ${contest.id_max_length} gacha raqamdan iborat bo'lishi kerak!`,
-      );
-    }
-
-    // 150 bilan boshlanishini tekshirish
-    if (!/^\d+$/.test(id) || Number(id) < 150) {
-      throw new Error(
-        "❌ ID raqam noto'ri yoki eskirgan! ID 150 bilan boshlanishi kerak.",
-      );
-    }
-
-    // Pattern tekshirish
-    if (!contest.id_pattern.test(id)) {
-      throw new Error("❌ ID noto'g'ri formatda!");
-    }
-
-    return id;
-  }
-
-  // YANGILANGAN: Retry operation (400 xatolarni retry qilmaslik)
   static async retryOperation(operation, maxRetries = 3, delay = 1000) {
     for (let i = 0; i < maxRetries; i++) {
       try {
         return await operation();
       } catch (error) {
-        // Agar 400 xato bo'lsa (message is not modified, invalid user_id), retry qilmaymiz
-        if (error.response && error.response.error_code === 400) {
-          console.log(
-            `⚠️ 400 error detected, skipping retry: ${error.description}`,
-          );
+        if (error?.response?.error_code === 400) {
+          console.log(`⚠️ 400 error, retry yo‘q: ${error.description || error.message}`);
           throw error;
         }
-
         if (i === maxRetries - 1) throw error;
-
-        console.log(
-          `🔄 Retry ${i + 1}/${maxRetries} after error: ${error.message}`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
+        console.log(`🔄 Retry ${i + 1}/${maxRetries}: ${error.message}`);
+        await new Promise((r) => setTimeout(r, delay * (i + 1)));
       }
     }
   }
@@ -584,67 +412,45 @@ class Utils {
   }
 
   static escapeMarkdown(text) {
-    const specialChars = [
-      "_",
-      "*",
-      "[",
-      "]",
-      "(",
-      ")",
-      "~",
-      "`",
-      ">",
-      "#",
-      "+",
-      "-",
-      "=",
-      "|",
-      "{",
-      "}",
-      ".",
-      "!",
-    ];
-    for (const char of specialChars) {
-      text = text.replace(new RegExp(`\\${char}`, "g"), `\\${char}`);
+    const specialChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
+    let out = String(text ?? "");
+    for (const ch of specialChars) {
+      out = out.replace(new RegExp(`\\${ch}`, "g"), `\\${ch}`);
     }
-    return text;
+    return out;
   }
 
-  static async sendMessageWithRetry(bot, chatId, text, options = {}) {
+  static async sendMessageWithRetry(telegram, chatId, text, options = {}) {
     try {
-      return await bot.telegram.sendMessage(chatId, text, options);
+      return await telegram.sendMessage(chatId, text, options);
     } catch (error) {
-      if (error.response && error.response.error_code === 429) {
-        // Too many requests - wait and retry
+      if (error?.response?.error_code === 429) {
         const retryAfter = error.response.parameters?.retry_after || 1;
-        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
-        return await bot.telegram.sendMessage(chatId, text, options);
+        await new Promise((r) => setTimeout(r, retryAfter * 1000));
+        return telegram.sendMessage(chatId, text, options);
       }
       throw error;
     }
   }
 }
 
-// ============================
-// 4. DATABASE SERVICE
-// ============================
+/* ============================
+   4) DATABASE SERVICE
+============================ */
 class DatabaseService {
   static async initialize() {
     try {
       console.log("🔗 MongoDB ga ulanmoqda...");
-
       await mongoose.connect(CONFIG.MONGODB_URI, CONFIG.MONGODB_OPTIONS);
 
       mongoose.connection.on("connected", () => {
-        console.log("✅ MongoDB ga muvaffaqiyatli ulandik");
-        Utils.logToFile("info", "MongoDB connected successfully");
+        console.log("✅ MongoDB ulandi");
+        Utils.logToFile("info", "MongoDB connected");
       });
 
       mongoose.connection.on("error", (err) => {
-        console.error("❌ MongoDB connection error:", err);
-        Utils.logToFile("error", "MongoDB connection error", {
-          error: err.message,
-        });
+        console.error("❌ MongoDB error:", err);
+        Utils.logToFile("error", "MongoDB connection error", { error: err.message });
       });
 
       mongoose.connection.on("disconnected", () => {
@@ -654,16 +460,14 @@ class DatabaseService {
 
       process.on("SIGINT", async () => {
         await mongoose.connection.close();
-        console.log("MongoDB connection closed through app termination");
+        console.log("MongoDB connection closed");
         process.exit(0);
       });
 
       return mongoose.connection;
     } catch (error) {
-      console.error("❌ MongoDB ga ulanib bo'lmadi:", error);
-      Utils.logToFile("error", "MongoDB connection failed", {
-        error: error.message,
-      });
+      console.error("❌ MongoDB ulanib bo‘lmadi:", error);
+      Utils.logToFile("error", "MongoDB connection failed", { error: error.message });
       throw error;
     }
   }
@@ -677,456 +481,322 @@ class DatabaseService {
       }
       return true;
     } catch (error) {
-      console.error("❌ MongoDB qayta ulanishda xatolik:", error);
+      console.error("❌ MongoDB qayta ulanish xatosi:", error);
       return false;
     }
   }
 
   static async findOrCreateUser(ctx) {
-    return await Utils.retryOperation(async () => {
+    return Utils.retryOperation(async () => {
       const { id, username, first_name, last_name, language_code } = ctx.from;
 
-      try {
-        let user = await User.findOne({ userId: id });
-
-        if (!user) {
-          user = new User({
-            userId: id,
-            telegramId: id,
-            username: username,
-            firstName: first_name,
-            lastName: last_name,
-            languageCode: language_code,
-            ipAddress: ctx.ip,
-            userAgent: ctx.telegram?.update_id ? "Telegram" : "Web",
-            isSubscribed: false,
-            contests: {
-              iphone: { participated: false },
-              redmi: { participated: false },
-              gentra: { participated: false },
-            },
-            lastActivity: new Date(),
-          });
-
-          await user.save();
-
-          await Log.create({
-            level: "info",
-            source: "bot",
-            action: "user_created",
-            userId: id,
-            message: "Yangi foydalanuvchi yaratildi",
-            details: { username, firstName: first_name },
-          });
-
-          console.log(
-            `👤 Yangi foydalanuvchi: ${username || first_name} (${id})`,
-          );
-        } else {
-          user.username = username;
-          user.firstName = first_name;
-          user.lastName = last_name;
-          user.lastActivity = new Date();
-          await user.save();
-        }
-
-        return user;
-      } catch (error) {
-        console.error("User yaratish/update qilishda xatolik:", error);
-        throw error;
-      }
-    });
-  }
-
-  static async checkAndUpdateSubscription(bot, userId) {
-    return await Utils.retryOperation(async () => {
-      try {
-        const user = await User.findOne({ userId });
-        if (!user) {
-          return {
-            isSubscribed: false,
-            notSubscribed: CONFIG.REQUIRED_CHANNELS,
-          };
-        }
-
-        // Check cache (last 5 minutes)
-        if (
-          user.subscriptionCheckedAt &&
-          Date.now() - user.subscriptionCheckedAt.getTime() <
-            CONFIG.SETTINGS.cache_duration &&
-          user.isSubscribed
-        ) {
-          return { isSubscribed: true, notSubscribed: [] };
-        }
-
-        const notSubscribed = [];
-        const subscribedChannels = [];
-
-        for (const channel of CONFIG.REQUIRED_CHANNELS) {
-          try {
-            let isMember = false;
-
-            try {
-              const member = await bot.getChatMember(channel.id, userId);
-              isMember = !(
-                member.status === "left" || member.status === "kicked"
-              );
-            } catch (error) {
-              console.log(
-                `Kanalni tekshirishda xatolik (${channel.name}):`,
-                error.message,
-              );
-            }
-
-            if (isMember) {
-              subscribedChannels.push({
-                channelId: channel.id,
-                channelName: channel.name,
-                subscribedAt: new Date(),
-                isAdmin: false, // Public kanallar uchun admin tekshirish kerak emas
-              });
-            } else {
-              notSubscribed.push(channel);
-            }
-          } catch (error) {
-            console.error(
-              `Kanalni tekshirishda xatolik (${channel.name}):`,
-              error.message,
-            );
-            notSubscribed.push(channel);
-          }
-        }
-
-        const isSubscribed = notSubscribed.length === 0;
-
-        user.isSubscribed = isSubscribed;
-        user.subscribedChannels = subscribedChannels;
-        user.subscriptionCheckedAt = new Date();
-        user.lastActivity = new Date();
-
+      let user = await User.findOne({ userId: id });
+      if (!user) {
+        user = new User({
+          userId: id,
+          telegramId: id,
+          username,
+          firstName: first_name,
+          lastName: last_name,
+          languageCode: language_code,
+          ipAddress: ctx.ip,
+          userAgent: ctx.telegram?.update_id ? "Telegram" : "Web",
+          isSubscribed: false,
+          contests: { iphone: { participated: false }, redmi: { participated: false }, gentra: { participated: false } },
+          lastActivity: new Date(),
+        });
         await user.save();
 
         await Log.create({
           level: "info",
           source: "bot",
-          action: "subscription_checked",
-          userId: userId,
-          message: "Obuna holati tekshirildi",
-          details: { isSubscribed, channels: subscribedChannels.length },
+          action: "user_created",
+          userId: id,
+          message: "Yangi foydalanuvchi yaratildi",
+          details: { username, firstName: first_name },
         });
 
-        return { isSubscribed, notSubscribed };
-      } catch (error) {
-        console.error("Obunani tekshirishda xatolik:", error);
-        throw error;
+        console.log(`👤 Yangi user: ${username || first_name} (${id})`);
+      } else {
+        user.username = username;
+        user.firstName = first_name;
+        user.lastName = last_name;
+        user.lastActivity = new Date();
+        await user.save();
       }
+      return user;
     });
   }
 
-  static async checkBotChannelsAccess(bot) {
-    console.log("🔍 Botning kanallarga kirish huquqi tekshirilmoqda...");
+  // telegram -> Telegraf ctx.telegram (Telegram instance) bo‘lishi kerak
+  static async checkAndUpdateSubscription(telegram, userId) {
+    return Utils.retryOperation(async () => {
+      const user = await User.findOne({ userId });
+      if (!user) return { isSubscribed: false, notSubscribed: CONFIG.REQUIRED_CHANNELS };
 
+      // cache
+      if (
+        user.subscriptionCheckedAt &&
+        Date.now() - user.subscriptionCheckedAt.getTime() < CONFIG.SETTINGS.cache_duration &&
+        user.isSubscribed
+      ) {
+        return { isSubscribed: true, notSubscribed: [] };
+      }
+
+      const notSubscribed = [];
+      const subscribedChannels = [];
+
+      for (const channel of CONFIG.REQUIRED_CHANNELS) {
+        let isMember = false;
+        try {
+          const member = await telegram.getChatMember(channel.id, userId);
+          isMember = !(member.status === "left" || member.status === "kicked");
+        } catch (e) {
+          // checkMember xatolari bo‘lishi mumkin (bot admin emas, username xato, va h.k.)
+          console.log(`Kanal tekshirish xatosi (${channel.name}):`, e.message);
+        }
+
+        if (isMember) {
+          subscribedChannels.push({
+            channelId: channel.id,
+            channelName: channel.name,
+            subscribedAt: new Date(),
+            isAdmin: false,
+          });
+        } else {
+          notSubscribed.push(channel);
+        }
+      }
+
+      const isSubscribed = notSubscribed.length === 0;
+      user.isSubscribed = isSubscribed;
+      user.subscribedChannels = subscribedChannels;
+      user.subscriptionCheckedAt = new Date();
+      user.lastActivity = new Date();
+      await user.save();
+
+      await Log.create({
+        level: "info",
+        source: "bot",
+        action: "subscription_checked",
+        userId,
+        message: "Obuna holati tekshirildi",
+        details: { isSubscribed, channels: subscribedChannels.length },
+      });
+
+      return { isSubscribed, notSubscribed };
+    });
+  }
+
+  static async checkBotChannelsAccess(telegram) {
+    console.log("🔍 Bot kanallarga kirish huquqi tekshirilyapti...");
     for (const channel of CONFIG.REQUIRED_CHANNELS) {
       try {
-        const chat = await bot.getChat(channel.id);
-        console.log(`✅ ${channel.name}: ${chat.type} kanaliga kirish mavjud`);
+        const chat = await telegram.getChat(channel.id);
+        console.log(`✅ ${channel.name}: ${chat.type}`);
       } catch (error) {
-        console.error(
-          `❌ ${channel.name} kanaliga kirishda xatolik:`,
-          error.message,
-        );
-        console.log(`⚠️ Botni ${channel.name} kanaliga ADMIN qilib qo'shing!`);
+        console.error(`❌ ${channel.name} access xato:`, error.message);
+        console.log(`⚠️ Botni ${channel.name} kanaliga admin qiling!`);
       }
     }
   }
 
   static async participateInContest(userId, contestType, participantId) {
-    return await Utils.retryOperation(async () => {
-      try {
-        const user = await User.findOne({ userId });
-        if (!user) {
-          throw new Error("Foydalanuvchi topilmadi");
-        }
+    return Utils.retryOperation(async () => {
+      const user = await User.findOne({ userId });
+      if (!user) throw new Error("Foydalanuvchi topilmadi");
 
-        // Check if already participated
-        if (user.contests[contestType]?.participated) {
-          throw new Error("Siz allaqachon qatnashgansiz");
-        }
-
-        // Check ID uniqueness
-        const existingUser = await User.findOne({
-          [`contests.${contestType}.participantId`]: participantId,
-          userId: { $ne: userId },
-        });
-
-        if (existingUser) {
-          throw new Error(
-            "Bu ID allaqachon boshqa foydalanuvchi tomonidan kiritilgan",
-          );
-        }
-
-        // Update user
-        user.contests[contestType] = {
-          participated: true,
-          participantId: participantId,
-          participationDate: new Date(),
-          verified: false,
-        };
-
-        user.participationCount += 1;
-        user.lastActivity = new Date();
-
-        await user.save();
-
-        await Log.create({
-          level: "info",
-          source: "bot",
-          action: "contest_participation",
-          userId: userId,
-          contestType: contestType,
-          message: "Konkursga qatnashish",
-          details: { contestType, participantId },
-        });
-
-        console.log(
-          `🎯 Foydalanuvchi ${userId} ${contestType} konkursiga qatnashdi`,
-        );
-
-        return user;
-      } catch (error) {
-        console.error("Konkursga qatnashishda xatolik:", error);
-        throw error;
+      if (user.contests[contestType]?.participated) {
+        throw new Error("Siz allaqachon qatnashgansiz");
       }
+
+      const existingUser = await User.findOne({
+        [`contests.${contestType}.participantId`]: participantId,
+        userId: { $ne: userId },
+      });
+
+      if (existingUser) {
+        throw new Error("Bu ID allaqachon boshqa foydalanuvchi tomonidan kiritilgan");
+      }
+
+      user.contests[contestType] = {
+        participated: true,
+        participantId,
+        participationDate: new Date(),
+        verified: false,
+      };
+
+      user.participationCount += 1;
+      user.lastActivity = new Date();
+      await user.save();
+
+      await Log.create({
+        level: "info",
+        source: "bot",
+        action: "contest_participation",
+        userId,
+        contestType,
+        message: "Konkursga qatnashish",
+        details: { contestType, participantId },
+      });
+
+      console.log(`🎯 User ${userId} ${contestType} qatnashdi`);
+      return user;
     });
   }
 
   static async handleUserLeftChannel(channelId, userId) {
     try {
       const user = await User.findOne({ userId });
-      if (!user) return;
+      if (!user) return null;
 
-      // Remove channel from subscribed channels
-      user.subscribedChannels = user.subscribedChannels.filter(
-        (channel) => channel.channelId !== channelId,
-      );
-
-      // Update subscription status
-      const channel = CONFIG.REQUIRED_CHANNELS.find((c) => c.id === channelId);
-      if (channel) {
-        // Check if user is still subscribed to other channels
-        const subscription = await this.checkAndUpdateSubscription(
-          null,
-          userId,
-        );
-
-        if (!subscription.isSubscribed && user.isSubscribed) {
-          // User left a required channel
-          user.isSubscribed = false;
-
-          // Notify user
-          return {
-            shouldNotify: true,
-            channelName: channel.name,
-            user,
-          };
-        }
-      }
-
+      user.subscribedChannels = user.subscribedChannels.filter((c) => c.channelId !== channelId);
+      user.isSubscribed = false; // chiqdi -> majburiy kanallardan bittasidan chiqsa status false
       user.lastActivity = new Date();
       await user.save();
+
+      const channel = CONFIG.REQUIRED_CHANNELS.find((c) => c.id === channelId);
 
       await Log.create({
         level: "warn",
         source: "system",
         action: "user_left_channel",
-        userId: userId,
+        userId,
         message: "Foydalanuvchi kanaldan chiqdi",
         details: { channelId },
       });
+
+      if (channel) {
+        return { shouldNotify: true, channelName: channel.name, user };
+      }
+      return null;
     } catch (error) {
-      console.error("Kanal chiqishini qayta ishlashda xatolik:", error);
+      console.error("User left channel handle xato:", error);
+      return null;
     }
   }
 
   static async selectWinner(contestType, adminId, adminUsername) {
-    return await Utils.retryOperation(async () => {
-      try {
-        // Check existing winners count
-        const existingWinnersCount = await Winner.countDocuments({
-          contestType,
-        });
-        const maxWinners =
-          CONFIG.CONTESTS[contestType.toUpperCase()].prize_count;
+    return Utils.retryOperation(async () => {
+      const existingWinnersCount = await Winner.countDocuments({ contestType });
+      const maxWinners = CONFIG.CONTESTS[contestType.toUpperCase()].prize_count;
 
-        if (existingWinnersCount >= maxWinners) {
-          throw new Error(
-            `Barcha ${maxWinners} ta g'olib allaqachon aniqlangan`,
-          );
-        }
-
-        // Get participants who haven't won yet
-        const existingWinners = await Winner.find({ contestType });
-        const winnerUserIds = existingWinners.map((w) => w.userId);
-
-        const participants = await User.aggregate([
-          {
-            $match: {
-              [`contests.${contestType}.participated`]: true,
-              isSubscribed: true,
-              userId: { $nin: winnerUserIds },
-              isBlocked: false,
-            },
-          },
-          { $sample: { size: 50 } },
-        ]);
-
-        if (participants.length === 0) {
-          throw new Error("G'olib aniqlash uchun yangi ishtirokchilar yo'q");
-        }
-
-        // Random selection
-        const randomIndex = Math.floor(Math.random() * participants.length);
-        const winner = participants[randomIndex];
-
-        // Create winner record
-        const winnerRecord = new Winner({
-          contestType: contestType,
-          userId: winner.userId,
-          userInfo: {
-            telegramId: winner.userId,
-            username: winner.username,
-            firstName: winner.firstName,
-            lastName: winner.lastName,
-          },
-          participantId: winner.contests[contestType].participantId,
-          prizeNumber: existingWinnersCount + 1,
-          selectedBy: {
-            adminId: adminId,
-            adminUsername: adminUsername,
-          },
-          selectionMethod: "random",
-          verificationCode: Utils.generateId().substring(0, 8).toUpperCase(),
-          selectedAt: new Date(),
-        });
-
-        await winnerRecord.save();
-
-        await Log.create({
-          level: "info",
-          source: "admin",
-          action: "winner_selected",
-          adminId: adminId,
-          contestType: contestType,
-          message: "Yangi g'olib aniqlandi",
-          details: {
-            winnerId: winner.userId,
-            contestType: contestType,
-            prizeNumber: existingWinnersCount + 1,
-          },
-        });
-
-        console.log(
-          `🏆 Yangi g\'olib: ${winner.username || winner.firstName} (${winner.userId})`,
-        );
-
-        return winnerRecord;
-      } catch (error) {
-        console.error("G'olibni aniqlashda xatolik:", error);
-        throw error;
+      if (existingWinnersCount >= maxWinners) {
+        throw new Error(`Barcha ${maxWinners} ta g‘olib allaqachon aniqlangan`);
       }
+
+      const existingWinners = await Winner.find({ contestType });
+      const winnerUserIds = existingWinners.map((w) => w.userId);
+
+      const participants = await User.aggregate([
+        {
+          $match: {
+            [`contests.${contestType}.participated`]: true,
+            isSubscribed: true,
+            userId: { $nin: winnerUserIds },
+            isBlocked: false,
+          },
+        },
+        { $sample: { size: 50 } },
+      ]);
+
+      if (participants.length === 0) throw new Error("G‘olib aniqlash uchun yangi ishtirokchi yo‘q");
+
+      const winner = participants[Math.floor(Math.random() * participants.length)];
+
+      const winnerRecord = new Winner({
+        contestType,
+        userId: winner.userId,
+        userInfo: {
+          telegramId: winner.userId,
+          username: winner.username,
+          firstName: winner.firstName,
+          lastName: winner.lastName,
+        },
+        participantId: winner.contests[contestType].participantId,
+        prizeNumber: existingWinnersCount + 1,
+        selectedBy: { adminId, adminUsername },
+        selectionMethod: "random",
+        verificationCode: Utils.generateId().substring(0, 8).toUpperCase(),
+        selectedAt: new Date(),
+      });
+
+      await winnerRecord.save();
+
+      await Log.create({
+        level: "info",
+        source: "admin",
+        action: "winner_selected",
+        adminId,
+        contestType,
+        message: "Yangi g‘olib aniqlandi",
+        details: { winnerId: winner.userId, contestType, prizeNumber: existingWinnersCount + 1 },
+      });
+
+      console.log(`🏆 Winner: ${winner.username || winner.firstName} (${winner.userId})`);
+      return winnerRecord;
     });
   }
 
   static async getStatistics() {
-    try {
-      const [
-        totalUsers,
-        subscribedUsers,
-        iphoneParticipants,
-        redmiParticipants,
-        gentraParticipants,
-        iphoneWinners,
-        redmiWinners,
-        gentraWinners,
-        todayUsers,
-        activeUsers,
-        blockedUsers,
-      ] = await Promise.all([
-        User.countDocuments(),
-        User.countDocuments({ isSubscribed: true }),
-        User.countDocuments({
-          "contests.iphone.participated": true,
-          isSubscribed: true,
-        }),
-        User.countDocuments({
-          "contests.redmi.participated": true,
-          isSubscribed: true,
-        }),
-        User.countDocuments({
-          "contests.gentra.participated": true,
-          isSubscribed: true,
-        }),
-        Winner.countDocuments({ contestType: "iphone" }),
-        Winner.countDocuments({ contestType: "redmi" }),
-        Winner.countDocuments({ contestType: "gentra" }),
-        User.countDocuments({
-          createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-        }),
-        User.countDocuments({
-          lastActivity: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-        }),
-        User.countDocuments({ isBlocked: true }),
-      ]);
+    const [
+      totalUsers,
+      subscribedUsers,
+      iphoneParticipants,
+      redmiParticipants,
+      gentraParticipants,
+      iphoneWinners,
+      redmiWinners,
+      gentraWinners,
+      todayUsers,
+      activeUsers,
+      blockedUsers,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isSubscribed: true }),
+      User.countDocuments({ "contests.iphone.participated": true, isSubscribed: true }),
+      User.countDocuments({ "contests.redmi.participated": true, isSubscribed: true }),
+      User.countDocuments({ "contests.gentra.participated": true, isSubscribed: true }),
+      Winner.countDocuments({ contestType: "iphone" }),
+      Winner.countDocuments({ contestType: "redmi" }),
+      Winner.countDocuments({ contestType: "gentra" }),
+      User.countDocuments({ createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } }),
+      User.countDocuments({ lastActivity: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }),
+      User.countDocuments({ isBlocked: true }),
+    ]);
 
-      return {
-        totalUsers,
-        subscribedUsers,
-        iphoneParticipants,
-        redmiParticipants,
-        gentraParticipants,
-        iphoneWinners,
-        redmiWinners,
-        gentraWinners,
-        todayUsers,
-        activeUsers,
-        blockedUsers,
-        iphoneRemaining: CONFIG.CONTESTS.IPHONE.prize_count - iphoneWinners,
-        redmiRemaining: CONFIG.CONTESTS.REDMI.prize_count - redmiWinners,
-        gentraRemaining: CONFIG.CONTESTS.GENTRA.prize_count - gentraWinners,
-      };
-    } catch (error) {
-      console.error("Statistika olishda xatolik:", error);
-      throw error;
-    }
+    return {
+      totalUsers,
+      subscribedUsers,
+      iphoneParticipants,
+      redmiParticipants,
+      gentraParticipants,
+      iphoneWinners,
+      redmiWinners,
+      gentraWinners,
+      todayUsers,
+      activeUsers,
+      blockedUsers,
+      iphoneRemaining: CONFIG.CONTESTS.IPHONE.prize_count - iphoneWinners,
+      redmiRemaining: CONFIG.CONTESTS.REDMI.prize_count - redmiWinners,
+      gentraRemaining: CONFIG.CONTESTS.GENTRA.prize_count - gentraWinners,
+    };
   }
 
   static async getWinners(contestType) {
-    try {
-      return await Winner.find({ contestType })
-        .sort({ selectedAt: -1 })
-        .limit(50);
-    } catch (error) {
-      console.error("G'oliblarni olishda xatolik:", error);
-      throw error;
-    }
+    return Winner.find({ contestType }).sort({ selectedAt: -1 }).limit(50);
   }
 
-  static async broadcastMessage(bot, adminMessage, filters = {}) {
+  static async broadcastMessage(telegram, adminMessage, filters = {}) {
     let notification;
 
     try {
-      // MongoDB ulanishini tekshirish
       await this.checkConnection();
 
       let query = {};
-      if (filters.subscribed !== undefined)
-        query.isSubscribed = filters.subscribed;
-      if (filters.participatedIn)
-        query[`contests.${filters.participatedIn}.participated`] = true;
-      if (filters.minParticipationCount)
-        query.participationCount = { $gte: filters.minParticipationCount };
-
-      // Faqat active va blocked bo'lmagan userlarni olish
+      if (filters.subscribed !== undefined) query.isSubscribed = filters.subscribed;
+      if (filters.participatedIn) query[`contests.${filters.participatedIn}.participated`] = true;
+      if (filters.minParticipationCount) query.participationCount = { $gte: filters.minParticipationCount };
       query.isBlocked = false;
       query.isActive = true;
 
@@ -1147,29 +817,21 @@ class DatabaseService {
 
       let successful = 0;
       let failed = 0;
+
       const batchSize = CONFIG.SETTINGS.broadcast_batch_size || 15;
       const delayBetweenBatches = CONFIG.SETTINGS.broadcast_delay || 1500;
 
-      console.log(
-        `📤 Broadcast boshlanmoqda: ${users.length} ta foydalanuvchi`,
-      );
+      console.log(`📤 Broadcast: ${users.length} ta user`);
 
       for (let i = 0; i < users.length; i += batchSize) {
         const batch = users.slice(i, i + batchSize);
-        console.log(
-          `📦 Batch ${Math.floor(i / batchSize) + 1}: ${batch.length} ta user`,
-        );
 
-        const batchPromises = batch.map(async (user) => {
+        const batchPromises = batch.map(async (u) => {
+          const chatId = String(u.userId);
           try {
-            // Telegram ID ni to'g'ri formatlash
-            const chatId = String(user.userId);
-
-            // Xabarni nusxalash
             if (adminMessage.poll) {
-              // Poll yuborish
               const poll = adminMessage.poll;
-              await bot.telegram.sendPoll(chatId, poll.question, poll.options, {
+              await telegram.sendPoll(chatId, poll.question, poll.options, {
                 is_anonymous: poll.is_anonymous || false,
                 type: poll.type || "regular",
                 allows_multiple_answers: poll.allows_multiple_answers || false,
@@ -1179,57 +841,39 @@ class DatabaseService {
                 close_date: poll.close_date,
               });
             } else if (adminMessage.photo) {
-              // Rasm yuborish
-              await bot.telegram.sendPhoto(
-                chatId,
-                adminMessage.photo[adminMessage.photo.length - 1].file_id,
-                {
-                  caption: adminMessage.caption,
-                  parse_mode: adminMessage.parse_mode,
-                  caption_entities: adminMessage.caption_entities,
-                },
-              );
+              await telegram.sendPhoto(chatId, adminMessage.photo[adminMessage.photo.length - 1].file_id, {
+                caption: adminMessage.caption,
+                parse_mode: adminMessage.parse_mode,
+                caption_entities: adminMessage.caption_entities,
+              });
             } else if (adminMessage.video) {
-              // Video yuborish
-              await bot.telegram.sendVideo(chatId, adminMessage.video.file_id, {
+              await telegram.sendVideo(chatId, adminMessage.video.file_id, {
                 caption: adminMessage.caption,
                 parse_mode: adminMessage.parse_mode,
                 caption_entities: adminMessage.caption_entities,
               });
             } else if (adminMessage.document) {
-              // Hujjat yuborish
-              await bot.telegram.sendDocument(
-                chatId,
-                adminMessage.document.file_id,
-                {
-                  caption: adminMessage.caption,
-                  parse_mode: adminMessage.parse_mode,
-                  caption_entities: adminMessage.caption_entities,
-                },
-              );
+              await telegram.sendDocument(chatId, adminMessage.document.file_id, {
+                caption: adminMessage.caption,
+                parse_mode: adminMessage.parse_mode,
+                caption_entities: adminMessage.caption_entities,
+              });
             } else if (adminMessage.audio) {
-              // Audio yuborish
-              await bot.telegram.sendAudio(chatId, adminMessage.audio.file_id, {
+              await telegram.sendAudio(chatId, adminMessage.audio.file_id, {
                 caption: adminMessage.caption,
                 parse_mode: adminMessage.parse_mode,
                 caption_entities: adminMessage.caption_entities,
               });
             } else if (adminMessage.voice) {
-              // Ovozli xabar yuborish
-              await bot.telegram.sendVoice(chatId, adminMessage.voice.file_id, {
+              await telegram.sendVoice(chatId, adminMessage.voice.file_id, {
                 caption: adminMessage.caption,
                 parse_mode: adminMessage.parse_mode,
                 caption_entities: adminMessage.caption_entities,
               });
             } else if (adminMessage.sticker) {
-              // Sticker yuborish
-              await bot.telegram.sendSticker(
-                chatId,
-                adminMessage.sticker.file_id,
-              );
+              await telegram.sendSticker(chatId, adminMessage.sticker.file_id);
             } else {
-              // Oddiy matn yuborish
-              await bot.telegram.sendMessage(chatId, adminMessage.text, {
+              await telegram.sendMessage(chatId, adminMessage.text, {
                 parse_mode: adminMessage.parse_mode,
                 entities: adminMessage.entities,
                 disable_web_page_preview: adminMessage.disable_web_page_preview,
@@ -1237,101 +881,65 @@ class DatabaseService {
             }
 
             successful++;
-            console.log(`✅ ${chatId}: Xabar yuborildi`);
-
-            // Har bir muvaffaqiyatli yuborishdan keyin kichik kutish
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await new Promise((r) => setTimeout(r, 100));
           } catch (error) {
             failed++;
 
-            // Bloklangan foydalanuvchilarni belgilash
-            const errorMessage = error.message || error.toString();
+            const errorMessage = error.message || String(error);
             if (
               errorMessage.includes("bot was blocked") ||
               errorMessage.includes("Forbidden") ||
               errorMessage.includes("user is deactivated") ||
               error.code === 403 ||
-              error.response?.error_code === 403
+              error?.response?.error_code === 403
             ) {
-              try {
-                await User.updateOne(
-                  { userId: user.userId },
-                  {
-                    $set: {
-                      isBlocked: true,
-                      isActive: false,
-                      blockReason: "Bot blocked by user",
-                    },
-                  },
-                );
-                console.log(`❌ ${user.userId}: Bot bloklangan (blocked)`);
-              } catch (dbError) {
-                console.log(`❌ DB update xatosi: ${dbError.message}`);
-              }
+              await User.updateOne(
+                { userId: u.userId },
+                { $set: { isBlocked: true, isActive: false, blockReason: "Bot blocked by user" } }
+              ).catch(() => {});
+              console.log(`❌ ${u.userId}: blocked`);
             } else if (
               errorMessage.includes("Too Many Requests") ||
               error.code === 429 ||
-              error.response?.error_code === 429
+              error?.response?.error_code === 429
             ) {
-              console.log(`⚠️ ${user.userId}: Rate limit (429)`);
+              const retryAfter = error?.response?.parameters?.retry_after || 2;
+              console.log(`⚠️ 429: ${u.userId} -> ${retryAfter}s`);
+              await new Promise((r) => setTimeout(r, retryAfter * 1000));
 
-              // Agar rate limit bo'lsa, kutilayotgan vaqtni olish
-              const retryAfter = error.response?.parameters?.retry_after || 2;
-              console.log(`⏳ ${retryAfter} soniya kutmoqda...`);
-              await new Promise((resolve) =>
-                setTimeout(resolve, retryAfter * 1000),
-              );
-
-              // Qayta urinish
               try {
-                await bot.telegram.sendMessage(
-                  String(user.userId),
-                  adminMessage.text,
-                  {
-                    parse_mode: adminMessage.parse_mode,
-                    entities: adminMessage.entities,
-                    disable_web_page_preview:
-                      adminMessage.disable_web_page_preview,
-                  },
-                );
+                await telegram.sendMessage(String(u.userId), adminMessage.text, {
+                  parse_mode: adminMessage.parse_mode,
+                  entities: adminMessage.entities,
+                  disable_web_page_preview: adminMessage.disable_web_page_preview,
+                });
                 successful++;
                 failed--;
-                console.log(`✅ ${user.userId}: Qayta urinish muvaffaqiyatli`);
-              } catch (retryError) {
-                console.log(
-                  `❌ ${user.userId}: Qayta urinish ham muvaffaqiyatsiz`,
-                );
+                console.log(`✅ retry ok: ${u.userId}`);
+              } catch (e2) {
+                console.log(`❌ retry fail: ${u.userId}`);
               }
             } else {
-              console.log(`❌ ${user.userId}: ${errorMessage}`);
+              console.log(`❌ ${u.userId}: ${errorMessage}`);
             }
 
-            // Log faylga yozish
-            await Utils.logToFile("error", `Broadcast xatosi: ${user.userId}`, {
+            await Utils.logToFile("error", `Broadcast xatosi: ${u.userId}`, {
               error: errorMessage,
               code: error.code,
             });
           }
         });
 
-        // Batch dagi barcha promiselarni bajarish
         await Promise.allSettled(batchPromises);
-
-        // MongoDB ulanishini qayta tekshirish
         await this.checkConnection();
 
-        // Statistikani yangilash
         notification.totalSent = Math.min(i + batchSize, users.length);
         notification.successful = successful;
         notification.failed = failed;
         await notification.save();
 
-        // Batchlar orasida kutish (rate limit uchun)
         if (i + batchSize < users.length) {
-          console.log(`⏳ ${delayBetweenBatches}ms kutmoqda...`);
-          await new Promise((resolve) =>
-            setTimeout(resolve, delayBetweenBatches),
-          );
+          await new Promise((r) => setTimeout(r, delayBetweenBatches));
         }
       }
 
@@ -1339,78 +947,59 @@ class DatabaseService {
       notification.completedAt = new Date();
       await notification.save();
 
-      console.log(
-        `✅ Broadcast yakunlandi: ${successful} muvaffaqiyatli, ${failed} xato`,
-      );
+      console.log(`✅ Broadcast tugadi: ${successful} ok, ${failed} fail`);
 
-      return {
-        total: users.length,
-        successful,
-        failed,
-      };
+      return { total: users.length, successful, failed };
     } catch (error) {
-      console.error("📤 Broadcast jarayonida xatolik:", error);
-
+      console.error("📤 Broadcast xato:", error);
       if (notification) {
         notification.status = "failed";
         await notification.save().catch(() => {});
       }
-
       throw error;
     }
   }
 }
 
-// ============================
-// 5. BOT SCENES - YANGILANGAN (safeEditMessageText ishlatiladi)
-// ============================
+/* ============================
+   5) BOT SCENES
+============================ */
 class BotScenes {
   static createContestScene(contestType) {
     const contest = CONFIG.CONTESTS[contestType.toUpperCase()];
-
     const scene = new Scenes.BaseScene(contestType.toLowerCase());
 
     scene.enter(async (ctx) => {
       try {
         const userId = ctx.from.id;
 
-        // User ni tekshirish
         const user = await DatabaseService.findOrCreateUser(ctx);
 
-        // Obunani tekshirish
-        const subscription = await DatabaseService.checkAndUpdateSubscription(
-          ctx.telegram,
-          userId,
-        );
+        const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
 
         if (!subscription.isSubscribed) {
           await ctx.reply(
             "📢 *ILTIMOS, KANALLARGA OBUNA BO'LING!*\n\n" +
               "Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'lishingiz kerak:",
-            { parse_mode: "Markdown" },
+            { parse_mode: "Markdown" }
           );
           await this.showChannelButtons(ctx, subscription.notSubscribed);
           return ctx.scene.leave();
         }
 
-        // Agar allaqachon qatnashgan bo'lsa
-        const hasParticipated =
-          user.contests[contestType.toLowerCase()]?.participated || false;
+        const hasParticipated = user.contests[contestType.toLowerCase()]?.participated || false;
 
         if (hasParticipated) {
-          const participantId =
-            user.contests[contestType.toLowerCase()]?.participantId;
-
+          const participantId = user.contests[contestType.toLowerCase()]?.participantId;
           await ctx.reply(
             "ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n" +
               "Siz ushbu konkursga allaqachon qatnashgansiz.\n" +
               `📝 Sizning ID raqamingiz: ${participantId || "Noma'lum"}`,
-            { parse_mode: "Markdown" },
+            { parse_mode: "Markdown" }
           );
           return ctx.scene.leave();
         }
 
-        // Contest information
         const contestInfo =
           `${contest.emoji} *${contest.name} KONKURSI*\n\n` +
           `🎁 ${contest.description}\n\n` +
@@ -1421,129 +1010,98 @@ class BotScenes {
           `🔑 *Promokod:* \`${contest.promo_code}\`\n\n` +
           `ID ni yuborish uchun quyidagi tugmani bosing:`;
 
-        const escapedInfo = Utils.escapeMarkdown(contestInfo);
-
-        await ctx.reply(escapedInfo, {
+        await ctx.reply(Utils.escapeMarkdown(contestInfo), {
           parse_mode: "MarkdownV2",
           ...Markup.inlineKeyboard([
-            [
-              Markup.button.callback(
-                "✅ Qatnashish",
-                `participate_${contestType.toLowerCase()}`,
-              ),
-            ],
-            [
-              Markup.button.callback(
-                "❌ Bekor qilish",
-                `cancel_${contestType.toLowerCase()}`,
-              ),
-            ],
+            [Markup.button.callback("✅ Qatnashish", `participate_${contestType.toLowerCase()}`)],
+            [Markup.button.callback("❌ Bekor qilish", `cancel_${contestType.toLowerCase()}`)],
           ]),
         });
       } catch (error) {
         console.error(`${contestType} scene enter error:`, error);
-        await ctx.reply(
-          "⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-          { parse_mode: "Markdown" },
-        );
+        await ctx.reply("⚠️ Botda vaqtinchalik xatolik yuz berdi. Keyinroq urinib ko'ring.", {
+          parse_mode: "Markdown",
+        });
         ctx.scene.leave();
       }
     });
-    // Qatnashish action - YANGILANGAN (safeEditMessageText ishlatiladi)
+
     scene.action(`participate_${contestType.toLowerCase()}`, async (ctx) => {
       try {
+        ctx.scene.state = ctx.scene.state || {};
+        ctx.scene.state.waitingForId = true;
+
         await Utils.safeEditMessageText(
           ctx,
           Utils.escapeMarkdown(
             "📝 *ID raqamingizni yuboring:*\n\n" +
               "Iltimos, saytdan olingan ID raqamingizni yuboring.\n" +
-              'ID "153" bilan boshlanadi, masalan: 153123456\n\n' +
-              "*Eslatma:* ID ni to'g'ri kiriting, keyinchalik o'zgartirib bo'lmaydi!",
+              "ID qanday formatda bo‘lsa ham qabul qilinadi.\n\n" +
+              "*Eslatma:* ID ni yuborganingizdan keyin keyinchalik o‘zgartirib bo‘lmaydi!"
           ),
-          {
-            parse_mode: "MarkdownV2",
-          },
+          { parse_mode: "MarkdownV2" }
         );
-
-        // Wait for ID input
-        scene.on("text", async (ctx) => {
-          try {
-            const userId = ctx.from.id;
-            const participantId = ctx.message.text.trim();
-
-            console.log(`${contestType} uchun ID kiritildi: ${participantId}`);
-
-            // Validate ID
-            let validId;
-            try {
-              const validId = participantId.trim();
-              console.log(`ID validatsiyadan o'tdi: ${validId}`);
-            } catch (validationError) {
-              console.log(`Validatsiya xatosi: ${validationError.message}`);
-
-              await ctx.reply(
-                Utils.escapeMarkdown(
-                  "❌ *NOTO'G'RI FORMAT!*\n\nID \"153\" bilan boshlanishi va faqat raqamlardan iborat bo'lishi kerak!\nMasalan: 153123456",
-                ),
-                {
-                  parse_mode: "MarkdownV2",
-                },
-              );
-
-              // Scene ni qayta kiritish
-              return scene.enter(ctx);
-            }
-
-            // Participate in contest
-            await DatabaseService.participateInContest(
-              userId,
-              contestType.toLowerCase(),
-              validId,
-            );
-
-            await ctx.reply(
-              Utils.escapeMarkdown(
-                "🎉 *TABRIKLAYMIZ!*\n\n" +
-                  "Siz konkursga muvaffaqiyatli qatnashdingiz!\n" +
-                  `📝 Sizning ID raqamingiz: \`${validId}\`\n\n` +
-                  "🏆 G'oliblar adminlar tomonidan aniqlanadi va sizga xabar beriladi.\n" +
-                  "🔔 Kutib turing, natijalar yaqin orada e'lon qilinadi!\n\n" +
-                  "⚠️ *Diqqat:* Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!",
-              ),
-              { parse_mode: "MarkdownV2" },
-            );
-
-            // Show main menu
-            await this.showMainMenu(ctx);
-          } catch (error) {
-            console.error(`${contestType} ID qayta ishlash xatosi:`, error);
-            await ctx.reply(Utils.escapeMarkdown(error.message), {
-              parse_mode: "MarkdownV2",
-            });
-            return scene.enter(ctx);
-          } finally {
-            ctx.scene.leave();
-          }
-        });
-
-        // Handle non-text messages
-        scene.on("message", async (ctx) => {
-          if (ctx.message.text) return;
-          await ctx.reply("❌ Iltimos, faqat ID raqamini yuboring!", {
-            parse_mode: "Markdown",
-          });
-        });
       } catch (error) {
         console.error(`${contestType} participation error:`, error);
-        await ctx.reply(
-          "⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-          { parse_mode: "Markdown" },
-        );
+        await ctx.reply("⚠️ Botda vaqtinchalik xatolik yuz berdi. Keyinroq urinib ko'ring.", {
+          parse_mode: "Markdown",
+        });
         ctx.scene.leave();
       }
     });
 
-    // Bekor qilish action - YANGILANGAN (safeEditMessageText ishlatiladi)
+    // ✅ ID qabul qilish: VALIDATSIYASIZ
+    scene.on("text", async (ctx) => {
+      if (!ctx.scene?.state?.waitingForId) return;
+
+      try {
+        const userId = ctx.from.id;
+        const participantIdRaw = (ctx.message?.text || "").trim();
+
+        if (!participantIdRaw) {
+          await ctx.reply("❌ ID bo‘sh bo‘lmasligi kerak. Qaytadan yuboring.");
+          return;
+        }
+        if (participantIdRaw.length > 64) {
+          await ctx.reply("❌ ID juda uzun. Qisqaroq yuboring.");
+          return;
+        }
+
+        const validId = participantIdRaw;
+
+        await DatabaseService.participateInContest(userId, ctx.scene.id, validId);
+
+        await ctx.reply(
+          Utils.escapeMarkdown(
+            "🎉 *TABRIKLAYMIZ!*\n\n" +
+              "Siz konkursga muvaffaqiyatli qatnashdingiz!\n" +
+              `📝 Sizning ID raqamingiz: \`${validId}\`\n\n` +
+              "🏆 G'oliblar adminlar tomonidan aniqlanadi va sizga xabar beriladi.\n" +
+              "🔔 Kutib turing, natijalar yaqin orada e'lon qilinadi!\n\n" +
+              "⚠️ *Diqqat:* Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!"
+          ),
+          { parse_mode: "MarkdownV2" }
+        );
+
+        ctx.scene.state.waitingForId = false;
+        await BotScenes.showMainMenu(ctx);
+        ctx.scene.leave();
+      } catch (error) {
+        console.error(`${contestType} ID qayta ishlash xatosi:`, error);
+        await ctx.reply(Utils.escapeMarkdown(error.message || "❌ Xatolik yuz berdi."), {
+          parse_mode: "MarkdownV2",
+        });
+        ctx.scene.state.waitingForId = false;
+        ctx.scene.leave();
+      }
+    });
+
+    scene.on("message", async (ctx) => {
+      if (!ctx.scene?.state?.waitingForId) return;
+      if (ctx.message?.text) return;
+      await ctx.reply("❌ Iltimos, faqat ID raqamini yuboring!", { parse_mode: "Markdown" });
+    });
+
     scene.action(`cancel_${contestType.toLowerCase()}`, async (ctx) => {
       await Utils.safeEditMessageText(ctx, "❌ Konkurs bekor qilindi.");
       ctx.scene.leave();
@@ -1558,53 +1116,42 @@ class BotScenes {
 
     scene.enter(async (ctx) => {
       try {
-        if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) {
-          return ctx.reply("❌ Siz admin emassiz!");
-        }
+        if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) return ctx.reply("❌ Siz admin emassiz!");
 
-        await ctx.reply(
-          "👨‍💻 *ADMIN PANEL*\n\n" +
-            "Botni boshqarish paneli. Quyidagi tugmalardan birini tanlang:",
-          {
-            parse_mode: "Markdown",
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback("📊 Statistika", "admin_stats")],
-              [Markup.button.callback("📣 Xabar yuborish", "admin_broadcast")],
-              [Markup.button.callback("🚪 Chiqish", "exit_admin")],
-            ]),
-          },
-        );
+        await ctx.reply("👨‍💻 *ADMIN PANEL*\n\nQuyidagilardan birini tanlang:", {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback("📊 Statistika", "admin_stats")],
+            [Markup.button.callback("📣 Xabar yuborish", "admin_broadcast")],
+            [Markup.button.callback("🚪 Chiqish", "exit_admin")],
+          ]),
+        });
       } catch (error) {
         console.error("Admin scene enter error:", error);
-        await ctx.reply(
-          "⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-          { parse_mode: "Markdown" },
-        );
+        await ctx.reply("⚠️ Xatolik. Keyinroq urinib ko‘ring.", { parse_mode: "Markdown" });
         ctx.scene.leave();
       }
     });
 
-    // Admin actions - YANGILANGAN (safeEditMessageText ishlatiladi)
     scene.action("admin_stats", async (ctx) => {
       try {
         const stats = await DatabaseService.getStatistics();
-
         await Utils.safeEditMessageText(
           ctx,
           `📊 *BOT STATISTIKASI*\n\n` +
-            `👥 *Jami foydalanuvchilar:* ${stats.totalUsers}\n` +
-            `🚫 *Bloklanganlar:* ${stats.blockedUsers}\n` +
-            `📈 *Bugun qo\'shilgan:* ${stats.todayUsers}\n` +
-            `🔥 *Faol foydalanuvchilar:* ${stats.activeUsers}\n` +
-            `✅ *Obuna bo\'lganlar:* ${stats.subscribedUsers}\n\n` +
-            `📱 *iPhone ishtirokchilar:* ${stats.iphoneParticipants}\n` +
-            `📱 *Redmi ishtirokchilar:* ${stats.redmiParticipants}\n` +
-            `🚗 *Gentra ishtirokchilar:* ${stats.gentraParticipants}\n\n` +
-            `🏆 *iPhone g\'oliblari:* ${stats.iphoneWinners}/${CONFIG.CONTESTS.IPHONE.prize_count}\n` +
-            `🏆 *Redmi g\'oliblari:* ${stats.redmiWinners}/${CONFIG.CONTESTS.REDMI.prize_count}\n` +
-            `🏆 *Gentra g\'oliblari:* ${stats.gentraWinners}/${CONFIG.CONTESTS.GENTRA.prize_count}\n\n` +
-            `🕒 *Oxirgi yangilanish:* ${Utils.formatDate(new Date(), "time")}`,
-          { parse_mode: "Markdown" },
+            `👥 *Jami:* ${stats.totalUsers}\n` +
+            `🚫 *Bloklangan:* ${stats.blockedUsers}\n` +
+            `📈 *Bugun qo‘shilgan:* ${stats.todayUsers}\n` +
+            `🔥 *24 soat aktiv:* ${stats.activeUsers}\n` +
+            `✅ *Obuna:* ${stats.subscribedUsers}\n\n` +
+            `📱 *iPhone ishtirokchi:* ${stats.iphoneParticipants}\n` +
+            `📱 *Redmi ishtirokchi:* ${stats.redmiParticipants}\n` +
+            `🚗 *Gentra ishtirokchi:* ${stats.gentraParticipants}\n\n` +
+            `🏆 *iPhone g‘olib:* ${stats.iphoneWinners}/${CONFIG.CONTESTS.IPHONE.prize_count}\n` +
+            `🏆 *Redmi g‘olib:* ${stats.redmiWinners}/${CONFIG.CONTESTS.REDMI.prize_count}\n` +
+            `🏆 *Gentra g‘olib:* ${stats.gentraWinners}/${CONFIG.CONTESTS.GENTRA.prize_count}\n\n` +
+            `🕒 *Yangilandi:* ${Utils.formatDate(new Date(), "time")}`,
+          { parse_mode: "Markdown" }
         );
       } catch (error) {
         console.error("Admin stats error:", error);
@@ -1614,20 +1161,16 @@ class BotScenes {
 
     scene.action("admin_broadcast", async (ctx) => {
       try {
-        await Utils.safeEditMessageText(
-          ctx,
-          "📣 *XABAR YUBORISH*\n\nXabarni yuborishni boshlash uchun tugmani bosing:",
-          {
-            parse_mode: "Markdown",
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback("📢 Hammaga yuborish", "broadcast_all")],
-              [Markup.button.callback("🔙 Orqaga", "back_to_admin")],
-            ]),
-          },
-        );
+        await Utils.safeEditMessageText(ctx, "📣 *XABAR YUBORISH*\n\nBoshlash uchun tanlang:", {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback("📢 Hammaga yuborish", "broadcast_all")],
+            [Markup.button.callback("🔙 Orqaga", "back_to_admin")],
+          ]),
+        });
       } catch (error) {
         console.error("Broadcast menu error:", error);
-        await ctx.answerCbQuery("❌ Xatolik yuz berdi!");
+        await ctx.answerCbQuery("❌ Xatolik!");
       }
     });
 
@@ -1635,16 +1178,13 @@ class BotScenes {
       try {
         if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) return;
 
-        ctx.session.broadcast = {
-          enabled: true,
-          filters: {}, // hammaga
-        };
+        ctx.session.broadcast = { enabled: true, filters: {} };
 
         await ctx.reply(
           "✅ Endi yubormoqchi bo‘lgan xabaringizni yuboring.\n\n" +
-            "🟢 Matn / rasm / video / voice / dumaloq video / fayl / poll — hammasi bo‘ladi.\n" +
+            "🟢 Matn / rasm / video / voice / fayl / poll — hammasi bo‘ladi.\n" +
             "❌ Bekor qilish: /cancel",
-          { parse_mode: "Markdown" },
+          { parse_mode: "Markdown" }
         );
 
         await ctx.answerCbQuery();
@@ -1658,129 +1198,94 @@ class BotScenes {
       try {
         if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) return;
 
-        // /cancel komandasi
         if (ctx.message?.text === "/cancel") {
           ctx.session.broadcast = null;
+          ctx.session.pendingBroadcast = null;
           return ctx.reply("❌ Broadcasting bekor qilindi.");
         }
 
-        // Broadcast rejimida bo'lsa
         if (ctx.session.broadcast?.enabled) {
           const filters = ctx.session.broadcast.filters || {};
 
-          // Foydalanuvchilarning sonini tekshirish
           let query = {};
-          if (filters.subscribed !== undefined)
-            query.isSubscribed = filters.subscribed;
-          if (filters.participatedIn)
-            query[`contests.${filters.participatedIn}.participated`] = true;
-          if (filters.minParticipationCount)
-            query.participationCount = { $gte: filters.minParticipationCount };
+          if (filters.subscribed !== undefined) query.isSubscribed = filters.subscribed;
+          if (filters.participatedIn) query[`contests.${filters.participatedIn}.participated`] = true;
+          if (filters.minParticipationCount) query.participationCount = { $gte: filters.minParticipationCount };
 
-          const userCount = await User.countDocuments(query);
+          const userCount = await User.countDocuments({ ...query, isBlocked: false, isActive: true });
 
           if (userCount > 500) {
             await ctx.reply(
               `⚠️ *DIQQAT!*\n\n` +
                 `Siz ${userCount} ta foydalanuvchiga xabar yubormoqchisiz.\n\n` +
-                `Bu jarayon ${Math.ceil(userCount / CONFIG.SETTINGS.broadcast_batch_size) * (CONFIG.SETTINGS.broadcast_delay / 1000)} sekund davom etadi.\n\n` +
-                `Davom ettirish uchun "✅ Davom ettirish" tugmasini bosing yoki /cancel tugmasini bosing.`,
+                `Davom ettirish uchun "✅ Davom ettirish" tugmasini bosing yoki /cancel bosing.`,
               {
                 parse_mode: "Markdown",
                 ...Markup.inlineKeyboard([
-                  [
-                    Markup.button.callback(
-                      "✅ Davom ettirish",
-                      "confirm_broadcast",
-                    ),
-                  ],
-                  [
-                    Markup.button.callback(
-                      "❌ Bekor qilish",
-                      "cancel_broadcast",
-                    ),
-                  ],
+                  [Markup.button.callback("✅ Davom ettirish", "confirm_broadcast")],
+                  [Markup.button.callback("❌ Bekor qilish", "cancel_broadcast")],
                 ]),
-              },
+              }
             );
 
-            // Tasdiqni kutish
-            ctx.session.pendingBroadcast = {
-              message: ctx.message,
-              filters: filters,
-            };
+            ctx.session.pendingBroadcast = { message: ctx.message, filters };
             ctx.session.broadcast.enabled = false;
             return;
           }
 
-          // Agar userlar kam bo'lsa, darrov boshlash
-          await ctx.reply(
-            `🚀 Xabar yuborish boshlanmoqda...\n👥 ${userCount} ta foydalanuvchi`,
-          );
+          await ctx.reply(`🚀 Xabar yuborish boshlandi...\n👥 ${userCount} ta foydalanuvchi`);
 
-          const result = await DatabaseService.broadcastMessage(
-            ctx.telegram,
-            ctx.message,
-            {
-              ...filters,
-              adminId: ctx.from.id,
-              adminUsername: ctx.from.username,
-            },
-          );
+          const result = await DatabaseService.broadcastMessage(ctx.telegram, ctx.message, {
+            ...filters,
+            adminId: ctx.from.id,
+            adminUsername: ctx.from.username,
+          });
 
           ctx.session.broadcast = null;
 
           await ctx.reply(
             `✅ *Xabar yuborish tugadi!*\n\n` +
-              `📊 *Statistika:*\n` +
-              `👥 Jami foydalanuvchilar: ${result.total}\n` +
-              `✅ Muvaffaqiyatli: ${result.successful}\n` +
+              `👥 Jami: ${result.total}\n` +
+              `✅ Yuborildi: ${result.successful}\n` +
               `❌ Xato: ${result.failed}\n` +
-              `📈 Muvaffaqiyat darajasi: ${((result.successful / result.total) * 100).toFixed(1)}%`,
-            { parse_mode: "Markdown" },
+              `📈 %: ${((result.successful / Math.max(result.total, 1)) * 100).toFixed(1)}%`,
+            { parse_mode: "Markdown" }
           );
         }
       } catch (error) {
-        console.error("Broadcast message handler error:", error);
+        console.error("Broadcast handler error:", error);
         ctx.session.broadcast = null;
+        ctx.session.pendingBroadcast = null;
         await ctx.reply("❌ Xabar yuborishda xatolik yuz berdi.");
       }
     });
 
-    // Tasdiq tugmasi
     scene.action("confirm_broadcast", async (ctx) => {
       try {
         await ctx.answerCbQuery();
-        await ctx.deleteMessage();
+        await ctx.deleteMessage().catch(() => {});
 
         const pending = ctx.session.pendingBroadcast;
-        if (!pending) {
-          return ctx.reply("❌ Tasdiqlash ma'lumotlari topilmadi.");
-        }
+        if (!pending) return ctx.reply("❌ Tasdiq ma'lumotlari topilmadi.");
 
-        await ctx.reply("🚀 Xabar yuborish boshlanmoqda...");
+        await ctx.reply("🚀 Xabar yuborish boshlandi...");
 
-        const result = await DatabaseService.broadcastMessage(
-          ctx.telegram,
-          pending.message,
-          {
-            ...pending.filters,
-            adminId: ctx.from.id,
-            adminUsername: ctx.from.username,
-          },
-        );
+        const result = await DatabaseService.broadcastMessage(ctx.telegram, pending.message, {
+          ...pending.filters,
+          adminId: ctx.from.id,
+          adminUsername: ctx.from.username,
+        });
 
         ctx.session.pendingBroadcast = null;
         ctx.session.broadcast = null;
 
         await ctx.reply(
           `✅ *Xabar yuborish tugadi!*\n\n` +
-            `📊 *Statistika:*\n` +
-            `👥 Jami foydalanuvchilar: ${result.total}\n` +
-            `✅ Muvaffaqiyatli: ${result.successful}\n` +
+            `👥 Jami: ${result.total}\n` +
+            `✅ Yuborildi: ${result.successful}\n` +
             `❌ Xato: ${result.failed}\n` +
-            `📈 Muvaffaqiyat darajasi: ${((result.successful / result.total) * 100).toFixed(1)}%`,
-          { parse_mode: "Markdown" },
+            `📈 %: ${((result.successful / Math.max(result.total, 1)) * 100).toFixed(1)}%`,
+          { parse_mode: "Markdown" }
         );
       } catch (error) {
         console.error("Confirm broadcast error:", error);
@@ -1788,25 +1293,18 @@ class BotScenes {
       }
     });
 
-    // Bekor qilish tugmasi
     scene.action("cancel_broadcast", async (ctx) => {
       await ctx.answerCbQuery();
-      await ctx.deleteMessage();
-
+      await ctx.deleteMessage().catch(() => {});
       ctx.session.pendingBroadcast = null;
       ctx.session.broadcast = null;
-
       await ctx.reply("❌ Broadcasting bekor qilindi.");
     });
 
-    // Orqaga tugmasi
-    scene.action("back_to_admin", async (ctx) => {
-      await ctx.scene.reenter();
-    });
+    scene.action("back_to_admin", async (ctx) => ctx.scene.reenter());
 
-    // Chiqish tugmasi
     scene.action("exit_admin", async (ctx) => {
-      await ctx.editMessageText("👋 Admin panelidan chiqildi.");
+      await ctx.editMessageText("👋 Admin panelidan chiqildi.").catch(() => {});
       ctx.scene.leave();
     });
 
@@ -1814,369 +1312,211 @@ class BotScenes {
   }
 
   static async showMainMenu(ctx) {
-    try {
-      await ctx.reply(
-        "🏠 *ASOSIY MENYU*\n\n" + "Quyidagi konkurslardan birini tanlang:",
-        {
-          parse_mode: "Markdown",
-          ...Markup.keyboard([
-            [CONFIG.CONTESTS.IPHONE.button_text],
-            [CONFIG.CONTESTS.REDMI.button_text],
-            [CONFIG.CONTESTS.GENTRA.button_text],
-            ["📋 Konkurs haqida", "🔄 Obunani tekshirish"],
-          ])
-            .resize()
-            .oneTime(),
-        },
-      );
-    } catch (error) {
-      console.error("Main menu error:", error);
-    }
+    await ctx.reply("🏠 *ASOSIY MENYU*\n\nKonkursni tanlang:", {
+      parse_mode: "Markdown",
+      ...Markup.keyboard([
+        [CONFIG.CONTESTS.IPHONE.button_text],
+        [CONFIG.CONTESTS.REDMI.button_text],
+        [CONFIG.CONTESTS.GENTRA.button_text],
+        ["📋 Konkurs haqida", "🔄 Obunani tekshirish"],
+      ])
+        .resize()
+        .oneTime(),
+    });
   }
 
   static async showChannelButtons(ctx, channels) {
-    try {
-      const buttons = channels.map((channel) => {
-        return [Markup.button.url(`📢 ${channel.name}`, channel.url)];
-      });
+    const buttons = channels.map((ch) => [Markup.button.url(`📢 ${ch.name}`, ch.url)]);
+    buttons.push([Markup.button.callback("✅ Obunani tekshirish", "check_subscription")]);
 
-      buttons.push([
-        Markup.button.callback("✅ Obunani tekshirish", "check_subscription"),
-      ]);
-
-      const message =
-        "Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'ling:";
-
-      await ctx.reply(Utils.escapeMarkdown(message), {
-        parse_mode: "MarkdownV2",
-        ...Markup.inlineKeyboard(buttons),
-      });
-    } catch (error) {
-      console.error("Channel buttons error:", error);
-    }
+    await ctx.reply(Utils.escapeMarkdown("Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'ling:"), {
+      parse_mode: "MarkdownV2",
+      ...Markup.inlineKeyboard(buttons),
+    });
   }
 }
 
-// ============================
-// 6. BOT MAIN CLASS - YANGILANGAN (Global Error Handlers qo'shildi)
-// ============================
+/* ============================
+   6) MAIN BOT CLASS
+============================ */
 class SenatorBot {
   constructor() {
     this.bot = new Telegraf(CONFIG.BOT_TOKEN);
     this.scenes = [];
     this.stage = null;
     this.initialized = false;
-
-    // Global error handlers
     this.setupGlobalErrorHandlers();
   }
 
   setupGlobalErrorHandlers() {
-    // Unhandled promise rejections
     process.on("unhandledRejection", (reason, promise) => {
-      console.error("⚠️ Unhandled Rejection at:", promise, "reason:", reason);
-      Utils.logToFile("error", "Unhandled Rejection", {
-        reason: reason?.message || reason,
-        stack: reason?.stack,
-      });
+      console.error("⚠️ Unhandled Rejection:", reason);
+      Utils.logToFile("error", "Unhandled Rejection", { reason: reason?.message || reason, stack: reason?.stack });
     });
 
-    // Uncaught exceptions
     process.on("uncaughtException", (error) => {
       console.error("⚠️ Uncaught Exception:", error);
-      Utils.logToFile("error", "Uncaught Exception", {
-        error: error.message,
-        stack: error.stack,
-      });
-      // Botni o'chirmaymiz, faqat log qilamiz
+      Utils.logToFile("error", "Uncaught Exception", { error: error.message, stack: error.stack });
     });
 
     console.log("✅ Global error handlers initialized");
   }
 
   async initialize() {
-    try {
-      console.log("🚀 Bot ishga tushirilmoqda...");
+    console.log("🚀 Bot ishga tushyapti...");
 
-      // Create directories
-      await this.createDirectories();
+    await this.createDirectories();
+    await DatabaseService.initialize();
 
-      // Initialize database
-      await DatabaseService.initialize();
+    const iphoneScene = BotScenes.createContestScene("IPHONE");
+    const redmiScene = BotScenes.createContestScene("REDMI");
+    const gentraScene = BotScenes.createContestScene("GENTRA");
+    const adminScene = BotScenes.createAdminScene();
 
-      // Create scenes
-      const iphoneScene = BotScenes.createContestScene("IPHONE");
-      const redmiScene = BotScenes.createContestScene("REDMI");
-      const gentraScene = BotScenes.createContestScene("GENTRA");
-      const adminScene = BotScenes.createAdminScene();
+    this.scenes = [iphoneScene, redmiScene, gentraScene, adminScene];
+    this.stage = new Scenes.Stage(this.scenes);
 
-      this.scenes = [iphoneScene, redmiScene, gentraScene, adminScene];
-      this.stage = new Scenes.Stage(this.scenes);
+    this.bot.use(session());
+    this.bot.use(this.stage.middleware());
 
-      // Setup middleware
-      this.bot.use(session());
-      this.bot.use(this.stage.middleware());
-
-      // Setup error handling middleware
-      this.bot.use(async (ctx, next) => {
-        try {
-          await next();
-        } catch (error) {
-          console.error("Bot error:", error);
-          Utils.logToFile("error", "Bot middleware error", {
-            error: error.message,
-            stack: error.stack,
-          });
-
-          try {
-            if (ctx.callbackQuery) {
-              await ctx.answerCbQuery(
-                "⚠️ Xatolik yuz berdi. Keyinroq urinib ko'ring.",
-              );
-            } else if (ctx.message) {
-              await ctx.reply(
-                "⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-                { parse_mode: "Markdown" },
-              );
-            }
-          } catch (e) {
-            console.error("Error reply failed:", e);
-          }
-        }
-      });
-
-      // Setup user middleware
-      this.bot.use(async (ctx, next) => {
-        if (ctx.message || ctx.callbackQuery) {
-          await DatabaseService.findOrCreateUser(ctx);
-        }
+    this.bot.use(async (ctx, next) => {
+      try {
         await next();
-      });
+      } catch (error) {
+        console.error("Bot middleware error:", error);
+        Utils.logToFile("error", "Bot middleware error", { error: error.message, stack: error.stack });
 
-      // Register commands and handlers
-      this.registerCommands();
-      this.registerActions();
-      this.registerEventHandlers();
+        try {
+          if (ctx.callbackQuery) await ctx.answerCbQuery("⚠️ Xatolik. Keyinroq urinib ko‘ring.");
+          else if (ctx.message) await ctx.reply("⚠️ Botda vaqtinchalik xatolik. Keyinroq urinib ko‘ring.");
+        } catch (_) {}
+      }
+    });
 
-      this.initialized = true;
-      console.log("✅ Bot muvaffaqiyatli ishga tushirildi!");
-    } catch (error) {
-      console.error("❌ Botni ishga tushirishda xatolik:", error);
-      throw error;
-    }
+    this.bot.use(async (ctx, next) => {
+      if (ctx.message || ctx.callbackQuery) await DatabaseService.findOrCreateUser(ctx);
+      await next();
+    });
+
+    this.registerCommands();
+    this.registerActions();
+    this.registerEventHandlers();
+
+    this.initialized = true;
+    console.log("✅ Bot tayyor!");
   }
 
   async createDirectories() {
-    try {
-      for (const path of Object.values(CONFIG.PATHS)) {
-        await fs.mkdir(path, { recursive: true });
-      }
-      console.log("📁 Papkalar yaratildi");
-    } catch (error) {
-      console.error("Papkalar yaratishda xatolik:", error);
+    for (const p of Object.values(CONFIG.PATHS)) {
+      await fs.mkdir(p, { recursive: true });
     }
+    console.log("📁 Papkalar yaratildi");
   }
 
   registerCommands() {
-    // Start command
     this.bot.start(async (ctx) => {
       try {
         const userId = ctx.from.id;
-
-        // Check subscription
-        const subscription = await DatabaseService.checkAndUpdateSubscription(
-          ctx.telegram,
-          userId,
-        );
+        const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
 
         if (subscription.notSubscribed.length > 0) {
           await ctx.reply(
             "🎉 *SENATOR KONKURS BOTIGA XUSH KELIBSIZ!*\n\n" +
-              "Bu bot orqali siz quyidagi sovg'alarni yutib olishingiz mumkin:\n" +
               "🏆 5 ta iPhone 17 Pro Max\n" +
               "🏆 10 ta Redmi telefon\n" +
-              "🏆 1 ta Chevrolet Gentra avtomobil\n\n" +
-              "Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling:",
-            { parse_mode: "Markdown" },
+              "🏆 1 ta Chevrolet Gentra\n\n" +
+              "Avval kanallarga obuna bo‘ling:",
+            { parse_mode: "Markdown" }
           );
           await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
         } else {
-          await ctx.reply(
-            "✅ *BARCHA KANALLARGA OBUNA BO'LGANSIZ!*\n\n" +
-              "Endi konkurslarda qatnashishingiz mumkin.\n" +
-              "Quyidagi menyudan kerakli konkursni tanlang:",
-            { parse_mode: "Markdown" },
-          );
+          await ctx.reply("✅ *BARCHA KANALLARGA OBUNA BO'LGANSIZ!*\n\nMenyudan tanlang:", {
+            parse_mode: "Markdown",
+          });
           await BotScenes.showMainMenu(ctx);
         }
       } catch (error) {
-        console.error("Start command error:", error);
-        await ctx.reply(
-          "⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-          { parse_mode: "Markdown" },
-        );
+        console.error("Start error:", error);
+        await ctx.reply("⚠️ Xatolik. Keyinroq urinib ko‘ring.");
       }
     });
 
-    // Admin command
     this.bot.command("admin", async (ctx) => {
-      if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) {
-        return ctx.reply("❌ Siz admin emassiz!");
-      }
-      ctx.scene.enter("admin");
+      if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) return ctx.reply("❌ Siz admin emassiz!");
+      return ctx.scene.enter("admin");
     });
 
-    // Help command
     this.bot.command("help", async (ctx) => {
       await ctx.reply(
-        "🏆 *KONKURS HAQIDA MA'LUMOT*\n\n" +
-          "🎁 *Sovg'alar:*\n" +
+        "🏆 *KONKURS HAQIDA*\n\n" +
+          "🎁 Sovg'alar:\n" +
           "• 5 ta iPhone 17 Pro Max\n" +
-          "• 10 ta Redmi telefon\n" +
-          "• 1 ta Chevrolet Gentra avtomobil\n\n" +
-          "📱 *iPhone 17 Pro Max yutish uchun:*\n" +
-          "1. Saytga kirish\n" +
-          "2. Promokod: SENATOR\n" +
-          "3. Ro'yxatdan o'tish\n" +
-          "4. ID ni yuborish\n\n" +
-          "📱 *Redmi yutish uchun:*\n" +
-          "1. Saytga kirish\n" +
-          "2. Promokod: SENATOR\n" +
-          "3. Ro'yxatdan o'tish\n" +
-          "4. ID ni yuborish\n\n" +
-          "🚗 *Gentra yutish uchun:*\n" +
-          "1. Saytga kirish\n" +
-          "2. Promokod: SENATOR\n" +
-          "3. Ariza to'ldirish\n" +
-          "4. ID ni yuborish\n\n" +
-          "⚠️ *DIQQAT!*\n" +
-          "• Har bir foydalanuvchi faqat bir marta qatnashishi mumkin!\n" +
-          "• Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!\n" +
-          "• Ba'zi kanallarga ADMIN bo'lish talab qilinadi!",
-        { parse_mode: "Markdown" },
+          "• 10 ta Redmi\n" +
+          "• 1 ta Gentra\n\n" +
+          "⚠️ Diqqat: kanallardan chiqsangiz, avtomatik chetlashtirilasiz!",
+        { parse_mode: "Markdown" }
       );
     });
 
-    // Stats command
     this.bot.command("stats", async (ctx) => {
-      if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) {
-        return ctx.reply("❌ Siz admin emassiz!");
-      }
-
-      try {
-        const stats = await DatabaseService.getStatistics();
-        await ctx.reply(
-          `📊 Statistika:\n\n` +
-            `Jami: ${stats.totalUsers}\n` +
-            `Obuna: ${stats.subscribedUsers}\n` +
-            `iPhone: ${stats.iphoneParticipants}\n` +
-            `Redmi: ${stats.redmiParticipants}\n` +
-            `Gentra: ${stats.gentraParticipants}`,
-          { parse_mode: "Markdown" },
-        );
-      } catch (error) {
-        console.error("Stats command error:", error);
-      }
+      if (!CONFIG.ADMIN_IDS.includes(ctx.from.id)) return ctx.reply("❌ Siz admin emassiz!");
+      const stats = await DatabaseService.getStatistics();
+      await ctx.reply(
+        `📊 Statistika:\n\nJami: ${stats.totalUsers}\nObuna: ${stats.subscribedUsers}\niPhone: ${stats.iphoneParticipants}\nRedmi: ${stats.redmiParticipants}\nGentra: ${stats.gentraParticipants}`
+      );
     });
   }
 
   registerActions() {
-    // Check subscription action
     this.bot.action("check_subscription", async (ctx) => {
       try {
         await ctx.answerCbQuery();
         const userId = ctx.from.id;
-        const subscription = await DatabaseService.checkAndUpdateSubscription(
-          ctx.telegram,
-          userId,
-        );
+
+        const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
 
         if (subscription.notSubscribed.length > 0) {
           await ctx.editMessageText(
-            "📢 *ILTIMOS, KANALLARGA OBUNA BO'LING!*\n\n" +
-              "Botdan to'liq foydalanish uchun quyidagi kanallarga obuna bo'lishingiz kerak:",
-            { parse_mode: "Markdown" },
+            "📢 *ILTIMOS, KANALLARGA OBUNA BO'LING!*\n\nQuyidagilarga obuna bo‘lishingiz kerak:",
+            { parse_mode: "Markdown" }
           );
           await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
         } else {
-          await ctx.editMessageText(
-            "✅ *BARCHA KANALLARGA OBUNA BO'LGANSIZ!*\n\n" +
-              "Endi konkurslarda qatnashishingiz mumkin.\n" +
-              "Quyidagi menyudan kerakli konkursni tanlang:",
-            { parse_mode: "Markdown" },
-          );
+          await ctx.editMessageText("✅ *BARCHA KANALLARGA OBUNA BO'LGANSIZ!*\n\nMenyudan tanlang:", {
+            parse_mode: "Markdown",
+          });
           await BotScenes.showMainMenu(ctx);
         }
       } catch (error) {
-        console.error("Check subscription error:", error);
-        await ctx.answerCbQuery("❌ Xatolik yuz berdi!");
+        console.error("check_subscription error:", error);
+        await ctx.answerCbQuery("❌ Xatolik!");
       }
     });
 
-    // Contest buttons
-    this.bot.hears(CONFIG.CONTESTS.IPHONE.button_text, async (ctx) => {
-      await this.handleContestButton(ctx, "IPHONE");
-    });
+    this.bot.hears(CONFIG.CONTESTS.IPHONE.button_text, async (ctx) => this.handleContestButton(ctx, "IPHONE"));
+    this.bot.hears(CONFIG.CONTESTS.REDMI.button_text, async (ctx) => this.handleContestButton(ctx, "REDMI"));
+    this.bot.hears(CONFIG.CONTESTS.GENTRA.button_text, async (ctx) => this.handleContestButton(ctx, "GENTRA"));
 
-    this.bot.hears(CONFIG.CONTESTS.REDMI.button_text, async (ctx) => {
-      await this.handleContestButton(ctx, "REDMI");
-    });
-
-    this.bot.hears(CONFIG.CONTESTS.GENTRA.button_text, async (ctx) => {
-      await this.handleContestButton(ctx, "GENTRA");
-    });
-
-    // Other buttons
     this.bot.hears("📋 Konkurs haqida", async (ctx) => {
       await ctx.reply(
-        "🏆 *KONKURS HAQIDA MA'LUMOT*\n\n" +
-          "🎁 *Sovg'alar:*\n" +
-          "• 5 ta iPhone 17 Pro Max\n" +
-          "• 10 ta Redmi telefon\n" +
-          "• 1 ta Chevrolet Gentra avtomobil\n\n" +
-          "📱 *iPhone 17 Pro Max yutish uchun:*\n" +
-          "1. Saytga kirish\n" +
-          "2. Promokod: SENATOR\n" +
-          "3. Ro'yxatdan o'tish\n" +
-          "4. ID ni yuborish\n\n" +
-          "📱 *Redmi yutish uchun:*\n" +
-          "1. Saytga kirish\n" +
-          "2. Promokod: SENATOR\n" +
-          "3. Ro'yxatdan o'tish\n" +
-          "4. ID ni yuborish\n\n" +
-          "🚗 *Gentra yutish uchun:*\n" +
-          "1. Saytga kirish\n" +
-          "2. Promokod: SENATOR\n" +
-          "3. Ariza to'ldirish\n" +
-          "4. ID ni yuborish\n\n" +
-          "⚠️ *DIQQAT!*\n" +
-          "• Har bir foydalanuvchi faqat bir marta qatnashishi mumkin!\n" +
-          "• Agar kanallardan chiqsangiz, konkursdan avtomatik chetlashtirilasiz!\n" +
-          "• Ba'zi kanallarga ADMIN bo'lish talab qilinadi!",
-        { parse_mode: "Markdown" },
+        "🏆 *KONKURS HAQIDA*\n\n" +
+          "🎁 Sovg'alar:\n• 5 ta iPhone 17 Pro Max\n• 10 ta Redmi\n• 1 ta Gentra\n\n" +
+          "⚠️ Kanallardan chiqsangiz chetlashtirilasiz!",
+        { parse_mode: "Markdown" }
       );
     });
 
     this.bot.hears("🔄 Obunani tekshirish", async (ctx) => {
       const userId = ctx.from.id;
-      const subscription = await DatabaseService.checkAndUpdateSubscription(
-        ctx.telegram,
-        userId,
-      );
+      const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
 
       if (subscription.notSubscribed.length > 0) {
-        await ctx.reply(
-          "❌ *SIZ BARCHA KANALLARGA OBUNA BO'LMAGANSIZ!*\n\n" +
-            "Quyidagi kanallarga obuna bo'lishingiz kerak:",
-          { parse_mode: "Markdown" },
-        );
+        await ctx.reply("❌ *Siz hammasiga obuna emassiz!*\n\nQuyidagilarga obuna bo‘ling:", {
+          parse_mode: "Markdown",
+        });
         await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
       } else {
-        await ctx.reply(
-          "✅ *BARCHA KANALLARGA OBUNA BO'LGANSIZ!*\n\n" +
-            "Siz konkurslarda qatnashishingiz mumkin.",
-          { parse_mode: "Markdown" },
-        );
+        await ctx.reply("✅ *Barcha kanallarga obuna bo‘lgansiz!*", { parse_mode: "Markdown" });
       }
     });
   }
@@ -2186,342 +1526,149 @@ class SenatorBot {
 
     try {
       const user = await User.findOne({ userId });
-      const subscription = await DatabaseService.checkAndUpdateSubscription(
-        ctx.telegram,
-        userId,
-      );
+      const subscription = await DatabaseService.checkAndUpdateSubscription(ctx.telegram, userId);
 
       if (!subscription.isSubscribed) {
-        await ctx.reply("❌ Avval barcha kanallarga obuna bo'ling!", {
-          parse_mode: "Markdown",
-        });
+        await ctx.reply("❌ Avval barcha kanallarga obuna bo'ling!", { parse_mode: "Markdown" });
         await BotScenes.showChannelButtons(ctx, subscription.notSubscribed);
         return;
       }
 
       if (user && user.contests[contestType.toLowerCase()]?.participated) {
-        const participantId =
-          user.contests[contestType.toLowerCase()]?.participantId;
+        const participantId = user.contests[contestType.toLowerCase()]?.participantId;
         await ctx.reply(
-          "ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n" +
-            "Siz ushbu konkursga allaqachon qatnashgansiz.\n" +
-            `📝 Sizning ID raqamingiz: ${participantId || "Noma'lum"}`,
-          { parse_mode: "Markdown" },
+          "ℹ️ *SIZ ALLAQACHON QATNASHGANSIZ!*\n\n" + `📝 Sizning ID: ${participantId || "Noma'lum"}`,
+          { parse_mode: "Markdown" }
         );
         return;
       }
 
-      ctx.scene.enter(contestType.toLowerCase());
+      await ctx.scene.enter(contestType.toLowerCase());
     } catch (error) {
-      console.error(`${contestType} contest error:`, error);
-      await ctx.reply(
-        "⚠️ Botda vaqtinchalik xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-        { parse_mode: "Markdown" },
-      );
+      console.error("handleContestButton error:", error);
+      await ctx.reply("⚠️ Xatolik. Keyinroq urinib ko‘ring.", { parse_mode: "Markdown" });
     }
   }
 
   registerEventHandlers() {
-    // YANGILANGAN: chat_join_request handler - to'g'ri yo'l bilan
-    this.bot.on("chat_join_request", async (ctx) => {
-      try {
-        const request = ctx.update.chat_join_request;
-        const userId = request.from.id;
-        const chatId = request.chat.id;
-        const user = request.from;
-
-        console.log(
-          `🔔 Join request from ${userId} (@${user.username || "no-username"}) to chat ${chatId}`,
-        );
-
-        // Check if this is one of our public channels
-        const channel = CONFIG.REQUIRED_CHANNELS.find(
-          (c) => c.id === chatId.toString(),
-        );
-
-        if (!channel) {
-          console.log(`ℹ️ Join request to unmonitored chat: ${chatId}`);
-          return;
-        }
-
-        console.log(`✅ Processing join request for ${channel.name}`);
-
-        // Public kanallar uchun avtomatik qabul qilamiz
-        try {
-          await Utils.safeApproveChatJoinRequest(this.bot, chatId, userId);
-          console.log(
-            `✅ Approved join request for ${userId} to ${channel.name}`,
-          );
-
-          // Send welcome message
-          try {
-            await this.bot.telegram.sendMessage(
-              userId,
-              `✅ *QABUL QILINDI!*\n\n` +
-                `Siz "${channel.name}" kanaliga qabul qilindingiz!\n\n` +
-                `Endi boshqa kanallarga ham obuna bo'lishingizni tekshirib ko'ring.`,
-              { parse_mode: "Markdown" },
-            );
-          } catch (error) {
-            console.error("Qabul xabarini yuborishda xatolik:", error.message);
-          }
-
-          // Update user subscription status
-          try {
-            await DatabaseService.checkAndUpdateSubscription(this.bot, userId);
-          } catch (error) {
-            console.error("User subscription update error:", error.message);
-          }
-        } catch (error) {
-          console.error(`❌ Join request processing error:`, error.message);
-          // Xato allaqachon safeApproveChatJoinRequest ichida log qilingan
-        }
-      } catch (error) {
-        console.error("❌ Join request handler error:", error);
-        Utils.logToFile("error", "Join request handler error", {
-          error: error.message,
-          stack: error.stack,
-        });
-      }
-    });
-
-    // Handle chat member updates (user leaving/joining channels)
+    // chat_member: user chiqsa/kirsa
     this.bot.on("chat_member", async (ctx) => {
       try {
-        const chatMember = ctx.chatMember;
-        const userId = chatMember.new_chat_member.user.id;
-        const chatId = chatMember.chat.id;
+        const cm = ctx.chatMember;
+        const userId = cm.new_chat_member.user.id;
+        const chatId = cm.chat.id;
 
-        // Check if this is one of our monitored channels
-        const channel = CONFIG.REQUIRED_CHANNELS.find(
-          (c) => c.id === chatId.toString(),
-        );
-        if (!channel) return;
+        // Eslatma: siz REQUIRED_CHANNELS ni @username bilan bergansiz.
+        // chatId bu yerda -100... bo‘ladi. Shuning uchun match qilmaydi (Telegram limitation).
+        // Baribir log qilamiz va foydalanuvchi obunasini qayta tekshirish periodic check orqali ishlaydi.
 
-        const oldStatus = chatMember.old_chat_member.status;
-        const newStatus = chatMember.new_chat_member.status;
+        const oldStatus = cm.old_chat_member.status;
+        const newStatus = cm.new_chat_member.status;
 
-        // User left the channel
         if (
           (oldStatus === "member" || oldStatus === "administrator") &&
           (newStatus === "left" || newStatus === "kicked")
         ) {
-          console.log(`👋 User ${userId} left channel ${channel.name}`);
+          const result = await DatabaseService.handleUserLeftChannel(String(chatId), userId);
 
-          const result = await DatabaseService.handleUserLeftChannel(
-            chatId,
-            userId,
-          );
-
-          // Notify user if they were subscribed
-          if (result && result.shouldNotify) {
-            try {
-              await this.bot.telegram.sendMessage(
+          if (result?.shouldNotify) {
+            await this.bot.telegram
+              .sendMessage(
                 userId,
-                `⚠️ *DIQQAT!*\n\n` +
-                  `Siz "${result.channelName}" kanalidan chiqdingiz!\n\n` +
-                  `❌ Bu sababli siz konkurslardan chetlashtirildingiz!\n\n` +
-                  `Qayta qatnashish uchun kanalga qayta obuna bo'ling:`,
-                {
-                  parse_mode: "Markdown",
-                  ...Markup.inlineKeyboard([
-                    [
-                      Markup.button.url(
-                        `📢 ${channel.name}ga qaytish`,
-                        channel.url,
-                      ),
-                    ],
-                    [
-                      Markup.button.callback(
-                        "🔄 Obunani tekshirish",
-                        "check_subscription",
-                      ),
-                    ],
-                  ]),
-                },
-              );
-            } catch (error) {
-              console.error("Foydalanuvchiga xabar yuborishda xatolik:", error);
-            }
+                `⚠️ *DIQQAT!*\n\nSiz kanal/guruhdan chiqdingiz.\n❌ Shu sabab konkurslardan chetlashtirildingiz.`,
+                { parse_mode: "Markdown" }
+              )
+              .catch(() => {});
           }
         }
 
-        // User joined the channel
         if (
           (oldStatus === "left" || oldStatus === "kicked") &&
           (newStatus === "member" || newStatus === "administrator")
         ) {
-          console.log(`👋 User ${userId} joined channel ${channel.name}`);
-
-          // Check if user is now subscribed to all channels
-          const subscription = await DatabaseService.checkAndUpdateSubscription(
-            this.bot.telegram,
-            userId,
-          );
-
-          if (subscription.isSubscribed) {
-            try {
-              await this.bot.telegram.sendMessage(
-                userId,
-                "✅ *BARCHA KANALLARGA OBUNA BO'LDINGIZ!*\n\n" +
-                  "Endi konkurslarda qatnashishingiz mumkin.\n" +
-                  "Quyidagi menyudan kerakli konkursni tanlang:",
-                { parse_mode: "Markdown" },
-              );
-
-              await BotScenes.showMainMenu({
-                reply: (text, options) =>
-                  this.bot.telegram.sendMessage(userId, text, options),
-              });
-            } catch (error) {
-              console.error("Qayta obuna xabarini yuborishda xatolik:", error);
-            }
-          }
+          // qayta tekshirish (public kanallar uchun chat_member update ko‘pincha kelmaydi)
+          await DatabaseService.checkAndUpdateSubscription(this.bot.telegram, userId).catch(() => {});
         }
       } catch (error) {
-        console.error("Chat member update error:", error);
+        console.error("chat_member error:", error);
       }
     });
   }
 
   async start() {
-    if (!this.initialized) {
-      await this.initialize();
-    }
+    if (!this.initialized) await this.initialize();
 
-    try {
-      await this.bot.launch({
-        dropPendingUpdates: true,
-        allowedUpdates: [
-          "message",
-          "callback_query",
-          "chat_member",
-          "my_chat_member",
-          "chat_join_request",
-        ],
-      });
+    await this.bot.launch({
+      dropPendingUpdates: true,
+      allowedUpdates: ["message", "callback_query", "chat_member", "my_chat_member", "chat_join_request"],
+    });
 
-      const botInfo = await this.bot.telegram.getMe();
-      console.log(`🤖 Bot: @${botInfo.username}`);
+    const botInfo = await this.bot.telegram.getMe();
+    console.log(`🤖 Bot: @${botInfo.username}`);
 
-      // Botning kanallarga kirishini tekshirish
-      await DatabaseService.checkBotChannelsAccess(this.bot.telegram);
+    await DatabaseService.checkBotChannelsAccess(this.bot.telegram);
 
-      console.log(`👑 Adminlar: ${CONFIG.ADMIN_IDS.join(", ")}`);
-      console.log(`📊 Kanallar: ${CONFIG.REQUIRED_CHANNELS.length} ta`);
-      console.log(
-        `📱 Sovg'alar: ${CONFIG.CONTESTS.IPHONE.prize_count} iPhone, ${CONFIG.CONTESTS.REDMI.prize_count} Redmi, ${CONFIG.CONTESTS.GENTRA.prize_count} Gentra`,
-      );
-      console.log("🚀 Bot faol va ishlamoqda...");
+    console.log(`👑 Adminlar: ${CONFIG.ADMIN_IDS.join(", ")}`);
+    console.log(`📊 Kanallar: ${CONFIG.REQUIRED_CHANNELS.length} ta`);
+    console.log(
+      `🎁 Sovg'alar: ${CONFIG.CONTESTS.IPHONE.prize_count} iPhone, ${CONFIG.CONTESTS.REDMI.prize_count} Redmi, ${CONFIG.CONTESTS.GENTRA.prize_count} Gentra`
+    );
+    console.log("🚀 Bot ishlayapti...");
 
-      // Periodic subscription check
-      setInterval(async () => {
-        try {
-          console.log("🔄 Foydalanuvchilarning obuna holati tekshirilmoqda...");
-          const users = await User.find({
-            isSubscribed: true,
-            lastActivity: {
-              $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            },
-          }).limit(100);
+    setInterval(async () => {
+      try {
+        console.log("🔄 Obuna holati periodic tekshiruv...");
+        const users = await User.find({
+          isSubscribed: true,
+          lastActivity: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        }).limit(100);
 
-          for (const user of users) {
-            try {
-              await DatabaseService.checkAndUpdateSubscription(
-                this.bot.telegram,
-                user.userId,
-              );
-            } catch (error) {
-              console.error(
-                `User ${user.userId} tekshirishda xatolik:`,
-                error.message,
-              );
-            }
-          }
-        } catch (error) {
-          console.error("Periodic check error:", error);
+        for (const u of users) {
+          await DatabaseService.checkAndUpdateSubscription(this.bot.telegram, u.userId).catch(() => {});
         }
-      }, CONFIG.SETTINGS.subscription_check_interval);
-    } catch (error) {
-      console.error("❌ Botni ishga tushirishda xatolik:", error);
-      throw error;
-    }
+      } catch (e) {
+        console.error("Periodic check error:", e);
+      }
+    }, CONFIG.SETTINGS.subscription_check_interval);
   }
 
   async stop() {
     try {
       await this.bot.stop();
       await mongoose.connection.close();
-      console.log("👋 Bot to'xtatildi");
+      console.log("👋 Bot to‘xtadi");
     } catch (error) {
-      console.error("Botni to'xtatishda xatolik:", error);
+      console.error("stop error:", error);
     }
   }
 }
 
-// ============================
-// 7. MAIN EXECUTION
-// ============================
+/* ============================
+   7) MAIN EXECUTION
+============================ */
 async function main() {
   try {
     const bot = new SenatorBot();
 
-    // Handle graceful shutdown
     process.once("SIGINT", () => {
-      console.log("🛑 SIGINT received, shutting down...");
-      bot
-        .stop()
-        .then(() => {
-          console.log("👋 Bot stopped gracefully");
-          process.exit(0);
-        })
-        .catch((error) => {
-          console.error("❌ Error during shutdown:", error);
-          process.exit(1);
-        });
+      console.log("🛑 SIGINT, shutdown...");
+      bot.stop().then(() => process.exit(0)).catch(() => process.exit(1));
     });
 
     process.once("SIGTERM", () => {
-      console.log("🛑 SIGTERM received, shutting down...");
-      bot
-        .stop()
-        .then(() => {
-          console.log("👋 Bot stopped gracefully");
-          process.exit(0);
-        })
-        .catch((error) => {
-          console.error("❌ Error during shutdown:", error);
-          process.exit(1);
-        });
+      console.log("🛑 SIGTERM, shutdown...");
+      bot.stop().then(() => process.exit(0)).catch(() => process.exit(1));
     });
 
-    // Start the bot
     await bot.start();
-
-    console.log("🚀 Bot started successfully with enhanced error handling");
+    console.log("🚀 Bot started successfully");
   } catch (error) {
-    console.error("❌ Botni ishga tushirishda og'ir xatolik:", error);
-    Utils.logToFile("error", "Bot startup error", {
-      error: error.message,
-      stack: error.stack,
-    });
+    console.error("❌ Startup error:", error);
+    Utils.logToFile("error", "Bot startup error", { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }
 
-// Start the application
-if (require.main === module) {
-  main();
-}
+if (require.main === module) main();
 
-// Export for testing
-module.exports = {
-  SenatorBot,
-  DatabaseService,
-  Utils,
-  CONFIG,
-  User,
-  Winner,
-  Log,
-  Notification,
-};
+module.exports = { SenatorBot, DatabaseService, Utils, CONFIG, User, Winner, Log, Notification };
