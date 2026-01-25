@@ -87,6 +87,13 @@ const CONFIG = {
       type: "public",
       username: "@senatorlive",
     },
+        {
+      id: "@senatorapk",
+      name: "SENATOR APK",
+      url: "https://t.me/SENATORAPK",
+      type: "public",
+      username: "@senatorapk",
+    },
     {
       id: "@senator_efir",
       name: "SENATOR EFIR",
