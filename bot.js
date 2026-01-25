@@ -87,16 +87,9 @@ const CONFIG = {
       type: "public",
       username: "@senatorlive",
     },
-        {
-      id: "@senatorapk",
-      name: "9-SHART",
-      url: "https://t.me/SENATORAPK",
-      type: "public",
-      username: "@senatorapk",
-    },
     {
       id: "@senator_efir",
-      name: "10-SHART",
+      name: "9-SHART",
       url: "https://t.me/SENATOR_EFIR",
       type: "public",
       username: "@senator_efir",
@@ -1151,11 +1144,6 @@ class BotScenes {
             `📈 *Bugun qo‘shilgan:* ${stats.todayUsers}\n` +
             `🔥 *24 soat aktiv:* ${stats.activeUsers}\n` +
             `✅ *Obuna:* ${stats.subscribedUsers}\n\n` +
-            `📱 *iPhone ishtirokchi:* ${stats.iphoneParticipants}\n` +
-            `📱 *Redmi ishtirokchi:* ${stats.redmiParticipants}\n` +
-            `🚗 *Gentra ishtirokchi:* ${stats.gentraParticipants}\n\n` +
-            `🏆 *iPhone g‘olib:* ${stats.iphoneWinners}/${CONFIG.CONTESTS.IPHONE.prize_count}\n` +
-            `🏆 *Redmi g‘olib:* ${stats.redmiWinners}/${CONFIG.CONTESTS.REDMI.prize_count}\n` +
             `🏆 *Gentra g‘olib:* ${stats.gentraWinners}/${CONFIG.CONTESTS.GENTRA.prize_count}\n\n` +
             `🕒 *Yangilandi:* ${Utils.formatDate(new Date(), "time")}`,
           { parse_mode: "Markdown" }
