@@ -87,7 +87,7 @@ const CONFIG = {
       name: "iPhone 17 Pro Max",
       prize_count: 5,
       site_url:
-        "https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration",
+        "https://xparisport.com/?promocode=senator",
       promo_code: "SENATOR",
       description: "5 ta iPhone 17 Pro Max telefon sovg'a qilinadi!",
       rules: ["Saytga ro'yxatdan o'ting", "Promokod: SENATOR", "ID raqamingizni oling"],
@@ -108,7 +108,7 @@ const CONFIG = {
       name: "Chevrolet Gentra",
       prize_count: 1,
       site_url:
-        "https://qbaff.com/L?tag=s_4361464m_94905c_&site=4361464&ad=94905&r=uz/registration",
+        "https://xparisport.com/?promocode=senator",
       promo_code: "SENATOR",
       description: "1 ta Chevrolet Gentra avtomobil sovg'a qilinadi!",
       rules: [
