@@ -1036,7 +1036,8 @@ class BotScenes {
               "4️⃣ BetWinner 🏆\n" +
               "5️⃣ DB bet ✅\n" +
               "6️⃣ Megaparibet ⚡️\n" +
-              "7️⃣ Melbet 🎉"
+              "7️⃣ 1 win⚡️\n" +
+              "8️⃣ Melbet 🎉"
           ),
           { 
             parse_mode: "MarkdownV2",
